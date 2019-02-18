@@ -1,0 +1,10 @@
+[package]
+name = "rosetta_code_count_tasks_rust"
+version = "0.1.0"
+authors = ["dave"]
+edition = "2018"
+
+[dependencies]
+reqwest = "0.9.9"
+url = "1.7.2"
+rustc-serialize = "0.3.24"

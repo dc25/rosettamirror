@@ -1,10 +1,13 @@
 extern crate reqwest;
 extern crate url;
 extern crate rustc_serialize;
- 
+
 use std::io::Read;
 use self::url::Url;
 use rustc_serialize::json::{self, Json};
+
+use std::fs::File;
+use std::io::prelude::*;
  
 pub struct Task {
     page_id: u64,
@@ -19,6 +22,9 @@ enum ParseError {
     /// There was a problem parsing the API response into JSON.
     Json(json::ParserError),
  
+    /// There was a problem parsing the API response into JSON.
+    IO(std::io::Error),
+ 
     /// Unexpected JSON format from response
     UnexpectedFormat,
 }
@@ -31,6 +37,12 @@ impl From<json::ParserError> for ParseError {
 impl From<reqwest::Error> for ParseError {
     fn from(error: reqwest::Error) -> Self {
         ParseError::Http(error)
+    }
+}
+ 
+impl From<std::io::Error> for ParseError {
+    fn from(error: std::io::Error) -> Self {
+        ParseError::IO(error)
     }
 }
  
@@ -87,7 +99,7 @@ fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, ParseError> {
     // Convert into own type
     tasks_json.iter().map(json_to_task).collect()
 }
-fn count_number_examples(task: &Json, task_id: u64) -> Result<u32, ParseError> {
+fn count_number_examples(task: &Json, task_id: u64, task_name: &String) -> Result<u32, ParseError> {
     let revisions =
         (task.find_path(&["query", "pages", task_id.to_string().as_str(), "revisions"])
             .and_then(|content| content.as_array())
@@ -96,6 +108,12 @@ fn count_number_examples(task: &Json, task_id: u64) -> Result<u32, ParseError> {
         .find("*")
         .and_then(|content| content.as_string())
         .ok_or(ParseError::UnexpectedFormat))?;
+    // println!("{}", content);
+    let mut file = (File::create(task_name))?;
+    //let mut file = (File::create("foo.txt"))?;
+
+    // file.write_all(b"Hello, world!")?;
+    file.write_all(content.as_bytes())?;
     Ok(content.split("=={{header").count() as u32)
 }
  
@@ -108,7 +126,7 @@ pub fn query_all_tasks() -> Vec<Task> {
 pub fn query_a_task(task: &Task) -> u32 {
     let query = construct_query_task_content(&task.page_id.to_string());
     let json: Json = query_api(query).unwrap();
-    count_number_examples(&json, task.page_id).unwrap()
+    count_number_examples(&json, task.page_id, &task.title).unwrap()
 }
 
 
@@ -116,6 +134,6 @@ fn main() {
     let all_tasks = query_all_tasks();
     for task in &all_tasks {
         let count = query_a_task(task);
-        println!("Task: {} has {} examples", task.title, count);
+        println!("Task: {} has {} examples", task.title, count); 
     }
 }

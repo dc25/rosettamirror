@@ -99,7 +99,7 @@ fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, ParseError> {
     // Convert into own type
     tasks_json.iter().map(json_to_task).collect()
 }
-fn count_number_examples(task: &Json, task_id: u64, task_name: &String) -> Result<u32, ParseError> {
+fn count_number_examples(task: &Json, task_id: u64) -> Result<&str, ParseError> {
     let revisions =
         (task.find_path(&["query", "pages", task_id.to_string().as_str(), "revisions"])
             .and_then(|content| content.as_array())
@@ -108,13 +108,7 @@ fn count_number_examples(task: &Json, task_id: u64, task_name: &String) -> Resul
         .find("*")
         .and_then(|content| content.as_string())
         .ok_or(ParseError::UnexpectedFormat))?;
-    // println!("{}", content);
-    let mut file = (File::create(task_name))?;
-    //let mut file = (File::create("foo.txt"))?;
-
-    // file.write_all(b"Hello, world!")?;
-    file.write_all(content.as_bytes())?;
-    Ok(content.split("=={{header").count() as u32)
+    Ok(content)
 }
  
 pub fn query_all_tasks() -> Vec<Task> {
@@ -123,10 +117,11 @@ pub fn query_all_tasks() -> Vec<Task> {
     parse_all_tasks(&json).unwrap()
 }
  
-pub fn query_a_task(task: &Task) -> u32 {
+pub fn query_a_task(task: &Task) -> String {
     let query = construct_query_task_content(&task.page_id.to_string());
     let json: Json = query_api(query).unwrap();
-    count_number_examples(&json, task.page_id, &task.title).unwrap()
+    let s = count_number_examples(&json, task.page_id).unwrap();
+    String::from(s)
 }
 
 
@@ -134,6 +129,7 @@ fn main() {
     let all_tasks = query_all_tasks();
     for task in &all_tasks {
         let count = query_a_task(task);
-        println!("Task: {} has {} examples", task.title, count); 
+        let mut file = (File::create(&task.title)).unwrap();
+        file.write_all(count.as_bytes());
     }
 }

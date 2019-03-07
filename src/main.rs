@@ -99,7 +99,7 @@ fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, ParseError> {
     // Convert into own type
     tasks_json.iter().map(json_to_task).collect()
 }
-fn count_number_examples(task: &Json, task_id: u64) -> Result<&str, ParseError> {
+fn get_task(task: &Json, task_id: u64) -> Result<String, ParseError> {
     let revisions =
         (task.find_path(&["query", "pages", task_id.to_string().as_str(), "revisions"])
             .and_then(|content| content.as_array())
@@ -108,7 +108,7 @@ fn count_number_examples(task: &Json, task_id: u64) -> Result<&str, ParseError> 
         .find("*")
         .and_then(|content| content.as_string())
         .ok_or(ParseError::UnexpectedFormat))?;
-    Ok(content)
+    Ok(String::from(content))
 }
  
 pub fn query_all_tasks() -> Vec<Task> {
@@ -120,8 +120,7 @@ pub fn query_all_tasks() -> Vec<Task> {
 pub fn query_a_task(task: &Task) -> String {
     let query = construct_query_task_content(&task.page_id.to_string());
     let json: Json = query_api(query).unwrap();
-    let s = count_number_examples(&json, task.page_id).unwrap();
-    String::from(s)
+    get_task(&json, task.page_id).unwrap()
 }
 
 

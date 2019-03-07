@@ -6,7 +6,7 @@ use std::io::Read;
 use self::url::Url;
 use rustc_serialize::json::{self, Json};
 
-use std::fs::File;
+use std::fs::*;
 use std::io::prelude::*;
  
 pub struct Task {
@@ -127,8 +127,15 @@ pub fn query_a_task(task: &Task) -> String {
 fn main() {
     let all_tasks = query_all_tasks();
     for task in &all_tasks {
-        let count = query_a_task(task);
-        let mut file = (File::create(&task.title)).unwrap();
-        file.write_all(count.as_bytes());
+        let content = query_a_task(task);
+
+        let path = "mirror/".to_owned() + &task.title;
+
+        DirBuilder::new()
+            .recursive(true)
+            .create(&path).unwrap();
+
+        let mut file = (File::create(path + "/task")).unwrap();
+        file.write_all(content.as_bytes());
     }
 }

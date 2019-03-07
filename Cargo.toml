@@ -1,5 +1,5 @@
 [package]
-name = "rosetta_code_count_tasks_rust"
+name = "rosettamirror"
 version = "0.1.0"
 authors = ["dave"]
 edition = "2018"

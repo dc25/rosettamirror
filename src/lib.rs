@@ -2,11 +2,14 @@ extern crate reqwest;
 extern crate url;
 extern crate rustc_serialize;
 
+use std::fs::*;
+use std::io::prelude::*;
+
 use std::io::Read;
 use self::url::Url;
 use rustc_serialize::json::{self, Json};
 
-pub struct Task {
+struct Task {
     page_id: u64,
     pub title: String,
 }
@@ -98,16 +101,31 @@ fn get_task(task: &Json, task_id: u64) -> Result<String, ParseError> {
     Ok(String::from(content))
 }
  
-pub fn query_all_tasks() -> Vec<Task> {
+fn query_all_tasks() -> Vec<Task> {
     let query = construct_query_category("Programming_Tasks");
     let json: Json = query_api(query).unwrap();
     parse_all_tasks(&json).unwrap()
 }
  
-pub fn query_a_task(task: &Task) -> String {
+fn query_a_task(task: &Task) -> String {
     let query = construct_query_task_content(&task.page_id.to_string());
     let json: Json = query_api(query).unwrap();
     get_task(&json, task.page_id).unwrap()
 }
 
 
+pub fn run() {
+    let all_tasks = query_all_tasks();
+    for task in &all_tasks {
+        let content = query_a_task(task);
+
+        let path = "mirror/".to_owned() + &task.title;
+
+        DirBuilder::new()
+            .recursive(true)
+            .create(&path).unwrap();
+
+        let mut file = (File::create(path + "/task")).unwrap();
+        file.write_all(content.as_bytes());
+    }
+}

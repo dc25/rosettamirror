@@ -22,9 +22,6 @@ enum ParseError {
     /// There was a problem parsing the API response into JSON.
     Json(json::ParserError),
  
-    /// There was a problem parsing the API response into JSON.
-    IO(std::io::Error),
- 
     /// Unexpected JSON format from response
     UnexpectedFormat,
 }
@@ -39,13 +36,6 @@ impl From<reqwest::Error> for ParseError {
         ParseError::Http(error)
     }
 }
- 
-impl From<std::io::Error> for ParseError {
-    fn from(error: std::io::Error) -> Self {
-        ParseError::IO(error)
-    }
-}
- 
  
 fn construct_query_category(category: &str) -> Url {
     let mut base_url = Url::parse("http://rosettacode.org/mw/api.php").unwrap();

@@ -13,7 +13,6 @@ struct Task {
     page_id: u64,
     pub title: String,
 }
- 
 #[derive(Debug)]
 enum ParseError {
     /// Something went wrong with the HTTP request to the API.
@@ -101,23 +100,21 @@ fn get_task(task: &Json, task_id: u64) -> Result<String, ParseError> {
     Ok(String::from(content))
 }
  
-fn query_all_tasks() -> Vec<Task> {
+fn query_all_tasks() -> Result<Vec<Task>, ParseError> {
     let query = construct_query_category("Programming_Tasks");
-    let json: Json = query_api(query).unwrap();
-    parse_all_tasks(&json).unwrap()
+    query_api(query).and_then (|json| parse_all_tasks(&json))
 }
  
-fn query_a_task(task: &Task) -> String {
+fn query_a_task(task: &Task) -> Result<String, ParseError> {
     let query = construct_query_task_content(&task.page_id.to_string());
-    let json: Json = query_api(query).unwrap();
-    get_task(&json, task.page_id).unwrap()
+    query_api(query).and_then(|json| get_task(&json, task.page_id))
 }
 
 
 pub fn run(dir: &str) {
-    let all_tasks = query_all_tasks();
+    let all_tasks = query_all_tasks().unwrap();
     for task in &all_tasks {
-        let content = query_a_task(task);
+        let content = query_a_task(task).unwrap();
 
         let mut path = dir.to_owned(); 
         path.push_str("/");

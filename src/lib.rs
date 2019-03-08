@@ -13,13 +13,16 @@ struct Task {
     page_id: u64,
     pub title: String,
 }
-#[derive(Debug)]
-enum ParseError {
+
+pub enum ParseError {
     /// Something went wrong with the HTTP request to the API.
     Http(reqwest::Error),
  
     /// There was a problem parsing the API response into JSON.
     Json(json::ParserError),
+ 
+    /// There was a problem parsing the API response into JSON.
+    Io(std::io::Error),
  
     /// Unexpected JSON format from response
     UnexpectedFormat,
@@ -33,6 +36,12 @@ impl From<json::ParserError> for ParseError {
 impl From<reqwest::Error> for ParseError {
     fn from(error: reqwest::Error) -> Self {
         ParseError::Http(error)
+    }
+}
+ 
+impl From<std::io::Error> for ParseError {
+    fn from(error: std::io::Error) -> Self {
+        ParseError::Io(error)
     }
 }
  
@@ -62,7 +71,7 @@ fn query_api(url: Url) -> Result<Json, ParseError> {
     let mut response = (reqwest::get(url.as_str()))?;
     // Build JSON
     let mut body = String::new();
-    response.read_to_string(&mut body).unwrap();
+    response.read_to_string(&mut body)?;
  
     Ok((Json::from_str(&body))?)
 }
@@ -102,19 +111,21 @@ fn get_task(task: &Json, task_id: u64) -> Result<String, ParseError> {
  
 fn query_all_tasks() -> Result<Vec<Task>, ParseError> {
     let query = construct_query_category("Programming_Tasks");
-    query_api(query).and_then (|json| parse_all_tasks(&json))
+    let json = query_api(query)?;
+    parse_all_tasks(&json)
 }
  
 fn query_a_task(task: &Task) -> Result<String, ParseError> {
     let query = construct_query_task_content(&task.page_id.to_string());
-    query_api(query).and_then(|json| get_task(&json, task.page_id))
+    let json = query_api(query)?;
+    get_task(&json, task.page_id)
 }
 
 
-pub fn run(dir: &str) {
-    let all_tasks = query_all_tasks().unwrap();
+pub fn run(dir: &str) -> Result<(), ParseError> {
+    let all_tasks = query_all_tasks()?;
     for task in &all_tasks {
-        let content = query_a_task(task).unwrap();
+        let content = query_a_task(task)?;
 
         let mut path = dir.to_owned(); 
         path.push_str("/");
@@ -122,9 +133,10 @@ pub fn run(dir: &str) {
 
         DirBuilder::new()
             .recursive(true)
-            .create(&path).unwrap();
+            .create(&path)?;
 
-        let mut file = (File::create(path + "/task")).unwrap();
-        file.write_all(content.as_bytes());
+        let mut file = (File::create(path + "/task"))?;
+        file.write_all(content.as_bytes())?;
     }
+    Ok(())
 }

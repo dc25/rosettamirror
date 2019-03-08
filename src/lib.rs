@@ -2,11 +2,8 @@ extern crate reqwest;
 extern crate url;
 extern crate rustc_serialize;
 
-use std::fs::*;
+use std::fs;
 use std::io::prelude::*;
-
-use std::io::Read;
-use self::url::Url;
 
 use rustc_serialize::json::{self, Json};
 
@@ -26,7 +23,7 @@ pub enum Error {
     Io(std::io::Error),
  
     /// There was a problem parsing the API response into JSON.
-    ParseUrl(self::url::ParseError),
+    ParseUrl(url::ParseError),
  
     /// Unexpected JSON format from response
     UnexpectedFormat,
@@ -49,14 +46,14 @@ impl From<std::io::Error> for Error {
     }
 }
  
-impl From<self::url::ParseError> for Error {
-    fn from(error: self::url::ParseError) -> Self {
+impl From<url::ParseError> for Error {
+    fn from(error: url::ParseError) -> Self {
         Error::ParseUrl(error)
     }
 }
  
-fn construct_query_category(category: &str) -> Result<Url, Error> {
-    let mut base_url = Url::parse("http://rosettacode.org/mw/api.php")?;
+fn construct_query_category(category: &str) -> Result<url::Url, Error> {
+    let mut base_url = url::Url::parse("http://rosettacode.org/mw/api.php")?;
     let cat = format!("Category:{}", category);
     let query_pairs = vec![("action", "query"),
                            ("format", "json"),
@@ -68,8 +65,8 @@ fn construct_query_category(category: &str) -> Result<Url, Error> {
     Ok(base_url)
 }
  
-fn construct_query_task_content(task_id: &str) -> Result<Url, Error> {
-    let mut base_url = Url::parse("http://rosettacode.org/mw/api.php")?;
+fn construct_query_task_content(task_id: &str) -> Result<url::Url, Error> {
+    let mut base_url = url::Url::parse("http://rosettacode.org/mw/api.php")?;
     let mut query_pairs =
         vec![("action", "query"), ("format", "json"), ("prop", "revisions"), ("rvprop", "content")];
     query_pairs.push(("pageids", task_id));
@@ -77,7 +74,7 @@ fn construct_query_task_content(task_id: &str) -> Result<Url, Error> {
     Ok(base_url)
 }
  
-fn query_api(url: Url) -> Result<Json, Error> {
+fn query_api(url: url::Url) -> Result<Json, Error> {
     let mut response = (reqwest::get(url.as_str()))?;
     // Build JSON
     let mut body = String::new();
@@ -88,13 +85,15 @@ fn query_api(url: Url) -> Result<Json, Error> {
  
 fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, Error> {
     let json_to_task = |json: &Json| -> Result<Task, Error> {
-        let page_id: u64 = (json.find("pageid")
+
+        let page_id = (json.find("pageid")
             .and_then(|id| id.as_u64())
             .ok_or(Error::UnexpectedFormat))?;
-        let title: &str = (json.find("title")
+
+        let title = (json.find("title")
             .and_then(|title| title.as_string())
             .ok_or(Error::UnexpectedFormat))?;
- 
+
         Ok(Task {
             page_id: page_id,
             title: title.to_owned(),
@@ -112,10 +111,12 @@ fn get_task(task: &Json, task_id: u64) -> Result<String, Error> {
         (task.find_path(&["query", "pages", task_id.to_string().as_str(), "revisions"])
             .and_then(|content| content.as_array())
             .ok_or(Error::UnexpectedFormat))?;
+
     let content = (revisions[0]
         .find("*")
         .and_then(|content| content.as_string())
         .ok_or(Error::UnexpectedFormat))?;
+
     Ok(String::from(content))
 }
  
@@ -141,11 +142,11 @@ pub fn run(dir: &str) -> Result<(), Error> {
         path.push_str("/");
         path.push_str(&task.title);
 
-        DirBuilder::new()
+        fs::DirBuilder::new()
             .recursive(true)
             .create(&path)?;
 
-        let mut file = (File::create(path + "/task"))?;
+        let mut file = (fs::File::create(path + "/task"))?;
         file.write_all(content.as_bytes())?;
     }
     Ok(())

@@ -114,12 +114,14 @@ fn query_a_task(task: &Task) -> String {
 }
 
 
-pub fn run() {
+pub fn run(dir: &str) {
     let all_tasks = query_all_tasks();
     for task in &all_tasks {
         let content = query_a_task(task);
 
-        let path = "mirror/".to_owned() + &task.title;
+        let mut path = dir.to_owned(); 
+        path.push_str("/");
+        path.push_str(&task.title);
 
         DirBuilder::new()
             .recursive(true)

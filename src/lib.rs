@@ -92,19 +92,21 @@ fn construct_query_task_content(task_id: &str) -> Result<url::Url, Error> {
     Ok(base_url)
 }
  
-fn parse_all_tasks(reply: &Json) -> Result<(Vec<Task>, Vec<(String, String)>), Error> { 
+fn parse_continue(reply: &Json) -> Vec<(String, String)> { 
 
     let json_to_continue = |sj: (&String,&Json)| {
         sj.1.as_string().map(|s| (sj.0.clone(), s.to_owned()))
     };
 
-    let continue_json: Vec<_>
-        = reply.find_path(&["continue"])
+    reply.find_path(&["continue"])
                .and_then(|cont| cont.as_object())
                .unwrap_or(&BTreeMap::new())
                .iter()
                .filter_map(json_to_continue)
-               .collect();
+               .collect()
+}
+
+fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, Error> { 
 
     let json_to_task = |json: &Json| {
 
@@ -122,15 +124,13 @@ fn parse_all_tasks(reply: &Json) -> Result<(Vec<Task>, Vec<(String, String)>), E
         })
     };
 
-    let tasks_result : Result<_,_> 
-        = reply.find_path(&["query", "categorymembers"])
+    reply.find_path(&["query", "categorymembers"])
                .and_then(|tasks| tasks.as_array())
                .ok_or(Error::UnexpectedFormat)?
                .iter()
                .map(json_to_task)
-               .collect();
+               .collect()
 
-    tasks_result.map(|tasks| (tasks, continue_json))
 }
 
 fn get_task(task: &Json, task_id: u64) -> Result<String, Error> {
@@ -150,10 +150,7 @@ fn get_task(task: &Json, task_id: u64) -> Result<String, Error> {
 fn query_all_tasks() -> Result<Vec<Task>, Error> {
     let query = construct_query_category("Programming_Tasks", "")?;
     let json = query_api(query)?;
-    match parse_all_tasks(&json) {
-        Ok((tasks, _)) => Ok(tasks),
-        Err(e) => Err(e),
-    }
+    parse_all_tasks(&json) 
 }
  
 fn query_a_task(task: &Task) -> Result<String, Error> {

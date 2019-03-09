@@ -4,6 +4,7 @@ extern crate rustc_serialize;
 
 use std::fs;
 use std::io::prelude::*;
+use std::collections::*;
 
 use rustc_serialize::json::{self, Json};
 
@@ -91,8 +92,21 @@ fn construct_query_task_content(task_id: &str) -> Result<url::Url, Error> {
     Ok(base_url)
 }
  
-fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, Error> {
-    let json_to_task = |json: &Json| -> Result<Task, Error> {
+fn parse_all_tasks(reply: &Json) -> Result<(Vec<Task>, Vec<(String, String)>), Error> { 
+
+    let json_to_continue = |sj: (&String,&Json)| {
+        sj.1.as_string().map(|s| (sj.0.clone(), s.to_owned()))
+    };
+
+    let continue_json: Vec<_>
+        = reply.find_path(&["continue"])
+               .and_then(|cont| cont.as_object())
+               .unwrap_or(&BTreeMap::new())
+               .iter()
+               .filter_map(json_to_continue)
+               .collect();
+
+    let json_to_task = |json: &Json| {
 
         let page_id = (json.find("pageid")
             .and_then(|id| id.as_u64())
@@ -108,28 +122,17 @@ fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, Error> {
         })
     };
 
-    let validate_continue = |sj: (&String,&Json)| -> Option<(String,String)> {
-        match sj.1.as_string() {
-            None =>  None,
-            Some(s) => Some((sj.0.clone(), s.to_owned())),
-        }
-    };
+    let tasks_json: &Vec<_>
+        = reply.find_path(&["query", "categorymembers"])
+               .and_then(|tasks| tasks.as_array())
+               .ok_or(Error::UnexpectedFormat)?;
 
-    let continue_json: Vec<(String, String)>
-        = reply.find_path(&["continue"])
-               .and_then(|cont| cont.as_object())
-               .map(|btm| btm.iter()
-                             .filter_map(validate_continue)
-                             .collect())
-               .unwrap_or(vec![]);
+    let tasks_result : Result<_,_> 
+        =  tasks_json.iter()
+                     .map(json_to_task)
+                     .collect();
 
-    println!("{:?}", continue_json);
-    let tasks_json = reply.find_path(&["query", "categorymembers"])
-        .and_then(|tasks| tasks.as_array())
-        .ok_or(Error::UnexpectedFormat)?;
- 
-    // Convert into own type
-    tasks_json.iter().map(json_to_task).collect()
+    tasks_result.map(|tasks| (tasks, continue_json))
 }
 
 fn get_task(task: &Json, task_id: u64) -> Result<String, Error> {
@@ -149,7 +152,10 @@ fn get_task(task: &Json, task_id: u64) -> Result<String, Error> {
 fn query_all_tasks() -> Result<Vec<Task>, Error> {
     let query = construct_query_category("Programming_Tasks", "")?;
     let json = query_api(query)?;
-    parse_all_tasks(&json)
+    match parse_all_tasks(&json) {
+        Ok((tasks, _)) => Ok(tasks),
+        Err(e) => Err(e),
+    }
 }
  
 fn query_a_task(task: &Task) -> Result<String, Error> {

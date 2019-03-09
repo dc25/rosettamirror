@@ -61,7 +61,7 @@ fn query_api(url: url::Url) -> Result<Json, Error> {
     Ok((Json::from_str(&body))?)
 }
  
-fn construct_query_category(category: &str) -> Result<url::Url, Error> {
+fn construct_query_category(category: &str, cont: &str) -> Result<url::Url, Error> {
     let mut base_url = url::Url::parse("http://rosettacode.org/mw/api.php")?;
     let cat = format!("Category:{}", category);
 
@@ -69,9 +69,9 @@ fn construct_query_category(category: &str) -> Result<url::Url, Error> {
         = vec![ ("action", "query")
               , ("format", "json")
               , ("list", "categorymembers")
-              , ("cmlimit", "500")
+              , ("cmlimit", "10")
               , ("cmtitle", &cat)
-              , ("continue", "")];
+              , ("continue", &cont)];
 
     base_url.query_pairs_mut().extend_pairs(query_pairs.into_iter());
     Ok(base_url)
@@ -107,9 +107,28 @@ fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, Error> {
             title: title.to_owned(),
         })
     };
-    let tasks_json = (reply.find_path(&["query", "categorymembers"])
+
+    let validate_continue = |kv: (&String,&Json)| -> Option<(String,String)> {
+        let k = kv.0;
+        let v = kv.1;
+        match v.as_string() {
+            None =>  None,
+            Some(s) => Some((k.clone(), s.to_owned())),
+        }
+    };
+
+    let continue_json: Vec<Option<(String, String)> >
+        = reply.find_path(&["continue"])
+               .and_then(|cont| cont.as_object())
+               .map(|btm| btm.iter()
+                             .map(validate_continue)
+                             .collect())
+               .ok_or(Error::UnexpectedFormat)?;
+
+    println!("{:?}", continue_json);
+    let tasks_json = reply.find_path(&["query", "categorymembers"])
         .and_then(|tasks| tasks.as_array())
-        .ok_or(Error::UnexpectedFormat))?;
+        .ok_or(Error::UnexpectedFormat)?;
  
     // Convert into own type
     tasks_json.iter().map(json_to_task).collect()
@@ -130,7 +149,7 @@ fn get_task(task: &Json, task_id: u64) -> Result<String, Error> {
 }
  
 fn query_all_tasks() -> Result<Vec<Task>, Error> {
-    let query = construct_query_category("Programming_Tasks")?;
+    let query = construct_query_category("Programming_Tasks", "")?;
     let json = query_api(query)?;
     parse_all_tasks(&json)
 }

@@ -4,10 +4,34 @@ extern crate url;
 use std::fs;
 use std::io::prelude::*;
 
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
 
-struct Task {
-    page_id: u64,
+#[derive(Serialize, Deserialize, Debug)]
+struct Cont {
+    cmcontinue: String,
+    #[serde(rename="continue")]
+    cont: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TaskData {
+    pageid: u64,
     title: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Query {
+    categorymembers: Vec<TaskData>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Data {
+    #[serde(rename="continue")]
+    cont: Cont,
+    query: Query,
 }
 
 pub enum Error {
@@ -19,6 +43,9 @@ pub enum Error {
  
     /// There was a problem parsing the API response into JSON.
     ParseUrl(url::ParseError),
+ 
+    /// There was a problem parsing the API response into JSON.
+    SerdeJson(serde_json::Error),
  
     /// Unexpected JSON format from response
     UnexpectedFormat,
@@ -42,6 +69,12 @@ impl From<url::ParseError> for Error {
     }
 }
  
+impl From<serde_json::Error> for Error {
+    fn from(error: serde_json::Error) -> Self {
+        Error::SerdeJson(error)
+    }
+}
+ 
 fn query_api(url: url::Url) -> Result<String, Error> {
     let mut response = (reqwest::get(url.as_str()))?;
     let mut body = String::new();
@@ -60,7 +93,8 @@ fn construct_query_category(category: &str, cont: &str) -> Result<url::Url, Erro
               , ("list", "categorymembers")
               , ("cmlimit", "10")
               , ("cmtitle", &cat)
-              , ("continue", &cont)];
+              , ("continue", &cont)
+              ];
 
     base_url.query_pairs_mut().extend_pairs(query_pairs.into_iter());
     Ok(base_url)
@@ -80,14 +114,14 @@ fn construct_query_task_content(task_id: &str) -> Result<url::Url, Error> {
     Ok(base_url)
 }
  
-fn query_all_tasks() -> Result<Vec<Task>, Error> {
+fn query_all_tasks() -> Result<String, Error> {
     let query = construct_query_category("Programming_Tasks", "")?;
     let json = query_api(query)?;
-    Ok(vec![])
+    Ok(json)
 }
  
-fn query_a_task(task: &Task) -> Result<String, Error> {
-    let query = construct_query_task_content(&task.page_id.to_string())?;
+fn query_a_task(task: &TaskData) -> Result<String, Error> {
+    let query = construct_query_task_content(&task.pageid.to_string())?;
     let json = query_api(query)?;
     Ok(json)
 }
@@ -95,7 +129,8 @@ fn query_a_task(task: &Task) -> Result<String, Error> {
 
 pub fn run(dir: &str) -> Result<(), Error> {
     let all_tasks = query_all_tasks()?;
-    for task in &all_tasks {
+    let task_data: Data = serde_json::from_str(&all_tasks)?;
+    for task in &task_data.query.categorymembers {
         let content = query_a_task(task)?;
 
         let mut path = dir.to_owned(); 

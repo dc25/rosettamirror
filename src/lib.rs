@@ -108,22 +108,20 @@ fn parse_all_tasks(reply: &Json) -> Result<Vec<Task>, Error> {
         })
     };
 
-    let validate_continue = |kv: (&String,&Json)| -> Option<(String,String)> {
-        let k = kv.0;
-        let v = kv.1;
-        match v.as_string() {
+    let validate_continue = |sj: (&String,&Json)| -> Option<(String,String)> {
+        match sj.1.as_string() {
             None =>  None,
-            Some(s) => Some((k.clone(), s.to_owned())),
+            Some(s) => Some((sj.0.clone(), s.to_owned())),
         }
     };
 
-    let continue_json: Vec<Option<(String, String)> >
+    let continue_json: Vec<(String, String)>
         = reply.find_path(&["continue"])
                .and_then(|cont| cont.as_object())
                .map(|btm| btm.iter()
-                             .map(validate_continue)
+                             .filter_map(validate_continue)
                              .collect())
-               .ok_or(Error::UnexpectedFormat)?;
+               .unwrap_or(vec![]);
 
     println!("{:?}", continue_json);
     let tasks_json = reply.find_path(&["query", "categorymembers"])

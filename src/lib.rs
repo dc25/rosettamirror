@@ -122,15 +122,13 @@ fn parse_all_tasks(reply: &Json) -> Result<(Vec<Task>, Vec<(String, String)>), E
         })
     };
 
-    let tasks_json: &Vec<_>
+    let tasks_result : Result<_,_> 
         = reply.find_path(&["query", "categorymembers"])
                .and_then(|tasks| tasks.as_array())
-               .ok_or(Error::UnexpectedFormat)?;
-
-    let tasks_result : Result<_,_> 
-        =  tasks_json.iter()
-                     .map(json_to_task)
-                     .collect();
+               .ok_or(Error::UnexpectedFormat)?
+               .iter()
+               .map(json_to_task)
+               .collect();
 
     tasks_result.map(|tasks| (tasks, continue_json))
 }

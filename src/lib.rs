@@ -3,7 +3,6 @@ extern crate url;
 
 use std::fs;
 use std::io::prelude::*;
-use std::collections::*;
 
 
 struct Task {
@@ -90,7 +89,7 @@ fn query_all_tasks() -> Result<Vec<Task>, Error> {
 fn query_a_task(task: &Task) -> Result<String, Error> {
     let query = construct_query_task_content(&task.page_id.to_string())?;
     let json = query_api(query)?;
-    Ok("".to_owned())
+    Ok(json)
 }
 
 

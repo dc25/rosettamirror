@@ -3,6 +3,7 @@ extern crate url;
 
 use std::fs;
 use std::io::prelude::*;
+use serde_json::Value;
 
 #[macro_use]
 extern crate serde_derive;
@@ -129,9 +130,11 @@ fn query_a_task(task: &TaskData) -> Result<String, Error> {
 
 pub fn run(dir: &str) -> Result<(), Error> {
     let all_tasks = query_all_tasks()?;
-    let task_data: Data = serde_json::from_str(&all_tasks)?;
-    for task in &task_data.query.categorymembers {
+    let tasks_data: Data = serde_json::from_str(&all_tasks)?;
+    for task in &tasks_data.query.categorymembers {
         let content = query_a_task(task)?;
+        let v: Value = serde_json::from_str(&content)?;
+        let code = &v["query"]["pages"][task.pageid.to_string()]["revisions"][0]["*"];
 
         let mut path = dir.to_owned(); 
         path.push_str("/");
@@ -141,7 +144,7 @@ pub fn run(dir: &str) -> Result<(), Error> {
         fs::DirBuilder::new().recursive(true).create(&path)?;
 
         let mut file = (fs::File::create(path + "/task"))?;
-        file.write_all(content.as_bytes())?;
+        file.write_all(serde_json::to_string(&code).unwrap().as_bytes())?;
     }
     Ok(())
 }

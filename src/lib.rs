@@ -4,13 +4,12 @@ extern crate url;
 use std::fs;
 use std::iter::*;
 use std::io::prelude::*;
-use serde_json::{Value, Map};
+use serde_json::{Value};
 use serde::Deserialize;
 
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
-#[macro_use]
 extern crate serde_json;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,94 +72,83 @@ fn query_api(url: url::Url) -> Result<String, Error> {
     Ok(body)
 }
  
-fn construct_query_category(category: &str, cont: &str) -> Result<url::Url, Error> {
-    let mut base_url = url::Url::parse("http://rosettacode.org/mw/api.php")?;
-    let cat = format!("Category:{}", category);
+fn query_tasks(cont_args: &Vec<(String, String)>) -> Result<String, Error> {
+    let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     let query_pairs 
         = vec![ ("action", "query")
               , ("format", "json")
               , ("list", "categorymembers")
-              , ("cmlimit", "10")
-              , ("cmtitle", &cat)
-              , ("continue", &cont)
+              , ("cmlimit", "200")
+              , ("cmtitle", "Category:Programming_Tasks")
               ];
 
-    base_url.query_pairs_mut().extend_pairs(query_pairs.into_iter());
-    Ok(base_url)
-}
- 
-fn construct_query_task_content(task_id: &str) -> Result<url::Url, Error> {
-    let mut base_url = url::Url::parse("http://rosettacode.org/mw/api.php")?;
-    let query_pairs 
-        = vec![ ("action", "query")
-              , ("format", "json")
-              , ("prop", "revisions")
-              , ("rvprop", "content")
-              , ("pageids", task_id)
-        ];
-
-    base_url.query_pairs_mut().extend_pairs(query_pairs.into_iter());
-    Ok(base_url)
-}
- 
-fn query_all_tasks() -> Result<String, Error> {
-    let query = construct_query_category("Programming_Tasks", "")?;
+    query.query_pairs_mut().extend_pairs(query_pairs.into_iter());
+    query.query_pairs_mut().extend_pairs(cont_args.into_iter());
     let json = query_api(query)?;
     Ok(json)
 }
  
 fn query_a_task(task: &TaskData) -> Result<String, Error> {
-    let query = construct_query_task_content(&task.pageid.to_string())?;
+    let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
+
+    let tp = &task.pageid.to_string();
+
+    let query_pairs 
+        = vec![ ("action", "query")
+              , ("format", "json")
+              , ("prop", "revisions")
+              , ("rvprop", "content")
+              , ("pageids", tp)
+              ];
+
+    query.query_pairs_mut().extend_pairs(query_pairs.into_iter());
     let json = query_api(query)?;
     Ok(json)
 }
 
 
-pub fn run(dir: &str) -> Result<(), Error> {
 
-    let mut cont_args : Vec<(String, String)> = vec![("continue".to_owned(), "".to_owned())];
-    let all_tasks = query_all_tasks()?;
-    let all_tasks_value: Value = serde_json::from_str(&all_tasks)?;
-    let query_value = &all_tasks_value["query"];
-    let cont_value = &all_tasks_value["continue"];
-    if cont_value.is_object() {
+fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
 
-        let cont_object = cont_value.as_object()
-                                .ok_or(Error::UnexpectedFormat)?;
+    let mut all_tasks: Vec<TaskData> = vec![];
 
-        let to_cont_pair = |ca: (&String, &Value)| { 
-            let cp1 = ca.1.as_str().ok_or(Error::UnexpectedFormat)?;
-            Ok((ca.0.clone(), cp1.to_owned()))
-        };
+    let mut cont_args : Vec<(String, String)> 
+                = vec![("continue".to_owned(), "".to_owned())];
 
-        let cont_args_result : Result<Vec<(String,String)>, Error> 
-                = cont_object 
-                    .iter().map(to_cont_pair).collect();
+    loop {
+        let tasks_string = query_tasks(&cont_args)?;
+        let tasks_value: Value = serde_json::from_str(&tasks_string)?;
+        let query_value = &tasks_value["query"];
+        let query:Query = Query::deserialize(query_value)?;
+        all_tasks.extend(query.categorymembers);
 
-        cont_args = cont_args_result?;
-    } else {
-        return Ok(());
+        let cont_value = &tasks_value["continue"];
+        if cont_value.is_object() {
+
+            let cont_object = cont_value.as_object()
+                                    .ok_or(Error::UnexpectedFormat)?;
+
+            let to_cont_pair = |ca: (&String, &Value)| { 
+                let cp1 = ca.1.as_str().ok_or(Error::UnexpectedFormat)?;
+                Ok((ca.0.clone(), cp1.to_owned()))
+            };
+
+            let cont_args_result : Result<Vec<(String,String)>, Error> 
+                    = cont_object 
+                        .iter().map(to_cont_pair).collect();
+
+            cont_args = cont_args_result?;
+        } else {
+            return Ok(all_tasks);
+        }
     }
-    let query:Query = Query::deserialize(query_value)?;
-    for task in &query.categorymembers {
-        let content = &query_a_task(task)?;
-        let v: Value = serde_json::from_str(content)?;
-
-    }
-    Ok(())
 }
 
-/*
-
 pub fn run(dir: &str) -> Result<(), Error> {
     let all_tasks = query_all_tasks()?;
-    let all_tasks_value: Value = serde_json::from_str(&all_tasks)?;
-    let query_value = &all_tasks_value["query"];
-    let cont_value = &all_tasks_value["continue"].as_object().unwrap_or(&serde_json::Map::new());
-    let cont_pairs = cont_value.iter().
-    let query = Query::deserialize(query_value)?;
-    for task in &query.categorymembers {
+    println!("{:?}", all_tasks.len());
+    for task in all_tasks.iter() {
         let content = &query_a_task(task)?;
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][task.pageid.to_string()]["revisions"][0]["*"];
@@ -177,4 +165,3 @@ pub fn run(dir: &str) -> Result<(), Error> {
     }
     Ok(())
 }
-*/

@@ -2,20 +2,16 @@ extern crate reqwest;
 extern crate url;
 
 use std::fs;
+use std::iter::*;
 use std::io::prelude::*;
-use serde_json::Value;
+use serde_json::{Value, Map};
+use serde::Deserialize;
 
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
+#[macro_use]
 extern crate serde_json;
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Cont {
-    cmcontinue: String,
-    #[serde(rename="continue")]
-    cont: String,
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TaskData {
@@ -26,13 +22,6 @@ struct TaskData {
 #[derive(Serialize, Deserialize, Debug)]
 struct Query {
     categorymembers: Vec<TaskData>
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Data {
-    #[serde(rename="continue")]
-    cont: Cont,
-    query: Query,
 }
 
 pub enum Error {
@@ -129,11 +118,51 @@ fn query_a_task(task: &TaskData) -> Result<String, Error> {
 
 
 pub fn run(dir: &str) -> Result<(), Error> {
+
+    let mut cont_args : Vec<(String, String)> = vec![("continue".to_owned(), "".to_owned())];
     let all_tasks = query_all_tasks()?;
-    let tasks_data: Data = serde_json::from_str(&all_tasks)?;
-    for task in &tasks_data.query.categorymembers {
-        let content = query_a_task(task)?;
-        let v: Value = serde_json::from_str(&content)?;
+    let all_tasks_value: Value = serde_json::from_str(&all_tasks)?;
+    let query_value = &all_tasks_value["query"];
+    let cont_value = &all_tasks_value["continue"];
+    if cont_value.is_object() {
+
+        let cont_object = cont_value.as_object()
+                                .ok_or(Error::UnexpectedFormat)?;
+
+        let to_cont_pair = |ca: (&String, &Value)| { 
+            let cp1 = ca.1.as_str().ok_or(Error::UnexpectedFormat)?;
+            Ok((ca.0.clone(), cp1.to_owned()))
+        };
+
+        let cont_args_result : Result<Vec<(String,String)>, Error> 
+                = cont_object 
+                    .iter().map(to_cont_pair).collect();
+
+        cont_args = cont_args_result?;
+    } else {
+        return Ok(());
+    }
+    let query:Query = Query::deserialize(query_value)?;
+    for task in &query.categorymembers {
+        let content = &query_a_task(task)?;
+        let v: Value = serde_json::from_str(content)?;
+
+    }
+    Ok(())
+}
+
+/*
+
+pub fn run(dir: &str) -> Result<(), Error> {
+    let all_tasks = query_all_tasks()?;
+    let all_tasks_value: Value = serde_json::from_str(&all_tasks)?;
+    let query_value = &all_tasks_value["query"];
+    let cont_value = &all_tasks_value["continue"].as_object().unwrap_or(&serde_json::Map::new());
+    let cont_pairs = cont_value.iter().
+    let query = Query::deserialize(query_value)?;
+    for task in &query.categorymembers {
+        let content = &query_a_task(task)?;
+        let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][task.pageid.to_string()]["revisions"][0]["*"];
 
         let mut path = dir.to_owned(); 
@@ -148,3 +177,4 @@ pub fn run(dir: &str) -> Result<(), Error> {
     }
     Ok(())
 }
+*/

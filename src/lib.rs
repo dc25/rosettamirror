@@ -1,5 +1,11 @@
 extern crate reqwest;
 extern crate url;
+extern crate serde;
+extern crate serde_json;
+
+#[macro_use]
+extern crate serde_derive;
+
 
 use std::fs;
 use std::iter::*;
@@ -7,10 +13,6 @@ use std::io::prelude::*;
 use serde_json::{Value};
 use serde::Deserialize;
 
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate serde_json;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TaskData {
@@ -126,8 +128,9 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
         let cont_value = &tasks_value["continue"];
         if cont_value.is_object() {
 
-            let cont_object = cont_value.as_object()
-                                    .ok_or(Error::UnexpectedFormat)?;
+            let cont_object = cont_value
+                                  .as_object()
+                                  .ok_or(Error::UnexpectedFormat)?;
 
             let to_cont_pair = |ca: (&String, &Value)| { 
                 let cp1 = ca.1.as_str().ok_or(Error::UnexpectedFormat)?;
@@ -161,7 +164,8 @@ pub fn run(dir: &str) -> Result<(), Error> {
         fs::DirBuilder::new().recursive(true).create(&path)?;
 
         let mut file = (fs::File::create(path + "/task"))?;
-        file.write_all(serde_json::to_string(&code).unwrap().as_bytes())?;
+        let slc = (&code).as_str().ok_or(Error::UnexpectedFormat)?;
+        file.write_all(slc.as_bytes())?;
     }
     Ok(())
 }

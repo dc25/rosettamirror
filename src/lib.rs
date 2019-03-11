@@ -148,6 +148,16 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
     }
 }
 
+fn write_code(dir: String, code: &str) -> Result<(), Error>
+{
+
+    fs::DirBuilder::new().recursive(true).create(&dir)?;
+
+    let mut file = (fs::File::create(dir + "/task"))?;
+    file.write_all(code.as_bytes())?;
+    Ok(())
+}
+
 pub fn run(dir: &str) -> Result<(), Error> {
     let all_tasks = query_all_tasks()?;
 
@@ -155,17 +165,13 @@ pub fn run(dir: &str) -> Result<(), Error> {
         let content = &query_a_task(task)?;
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
-
-        let mut path = dir.to_owned(); 
-        path.push_str("/");
-        let task_dir = str::replace(&task.title, " ", "_");
-        path.push_str(&task_dir);
-
-        fs::DirBuilder::new().recursive(true).create(&path)?;
-
-        let mut file = (fs::File::create(path + "/task"))?;
         let slc = (&code).as_str().ok_or(Error::UnexpectedFormat)?;
-        file.write_all(slc.as_bytes())?;
+
+        // let mut path = dir.to_owned() + "/";
+        let path = dir.to_owned() 
+                       + "/" 
+                       + &str::replace(&task.title, " ", "_");
+        write_code(path, slc)?;
     }
     Ok(())
 }

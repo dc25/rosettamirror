@@ -80,6 +80,7 @@ fn query_tasks(cont_args: &Vec<(String, String)>) -> Result<String, Error> {
     let query_pairs 
         = vec![ ("action", "query")
               , ("format", "json")
+              , ("formatversion", "2")
               , ("list", "categorymembers")
               , ("cmlimit", "200")
               , ("cmtitle", "Category:Programming_Tasks")
@@ -99,6 +100,7 @@ fn query_a_task(task: &TaskData) -> Result<String, Error> {
     let query_pairs 
         = vec![ ("action", "query")
               , ("format", "json")
+              , ("formatversion", "2")
               , ("prop", "revisions")
               , ("rvprop", "content")
               , ("pageids", tp)
@@ -108,8 +110,6 @@ fn query_a_task(task: &TaskData) -> Result<String, Error> {
     let json = query_api(query)?;
     Ok(json)
 }
-
-
 
 fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
 
@@ -150,11 +150,11 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
 
 pub fn run(dir: &str) -> Result<(), Error> {
     let all_tasks = query_all_tasks()?;
-    println!("{:?}", all_tasks.len());
+
     for task in all_tasks.iter() {
         let content = &query_a_task(task)?;
         let v: Value = serde_json::from_str(content)?;
-        let code = &v["query"]["pages"][task.pageid.to_string()]["revisions"][0]["*"];
+        let code = &v["query"]["pages"][0]["revisions"][0]["content"];
 
         let mut path = dir.to_owned(); 
         path.push_str("/");

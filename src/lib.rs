@@ -2,6 +2,7 @@ extern crate reqwest;
 extern crate url;
 extern crate serde;
 extern crate serde_json;
+extern crate regex;
 
 #[macro_use]
 extern crate serde_derive;
@@ -12,6 +13,7 @@ use std::iter::*;
 use std::io::prelude::*;
 use serde_json::{Value};
 use serde::Deserialize;
+use regex::Regex;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,6 +27,7 @@ struct Query {
     categorymembers: Vec<TaskData>
 }
 
+#[derive(Debug)]
 pub enum Error {
     /// Something went wrong with the HTTP request to the API.
     Http(reqwest::Error),
@@ -38,6 +41,9 @@ pub enum Error {
     /// There was a problem parsing the API response into JSON.
     SerdeJson(serde_json::Error),
  
+    /// There was a problem parsing the API response into JSON.
+    Regex(regex::Error),
+
     /// Unexpected JSON format from response
     UnexpectedFormat,
 }
@@ -63,6 +69,12 @@ impl From<url::ParseError> for Error {
 impl From<serde_json::Error> for Error {
     fn from(error: serde_json::Error) -> Self {
         Error::SerdeJson(error)
+    }
+}
+ 
+impl From<regex::Error> for Error {
+    fn from(error: regex::Error) -> Self {
+        Error::Regex(error)
     }
 }
  
@@ -153,8 +165,34 @@ fn write_code(dir: String, code: &str) -> Result<(), Error>
 
     fs::DirBuilder::new().recursive(true).create(&dir)?;
 
-    let mut file = (fs::File::create(dir + "/task"))?;
-    file.write_all(code.as_bytes())?;
+    let header_re = Regex::new(r"(?m)^==\{\{[Hh]eader\|")?;
+    let mut head_it = header_re.split(code);
+    head_it.next();
+    for head in head_it {
+        let language_re = Regex::new(r"([^\}]*)\}\}==")?;
+        match language_re.captures(head) {
+            None => (),
+            Some(lang) => 
+                match lang.get(1) {
+                    None => (),
+                    Some(l) => println!("{}", l.as_str()),
+                },
+        }
+        let prog_re = Regex::new(r"(?m)<lang[^\n]*>")?;
+        let mut prog_it = prog_re.split(head);
+        prog_it.next();
+        for prog in prog_it {
+            let prog_end_re = Regex::new(r"(?ms)(.*)</lang>")?;
+            match prog_end_re.captures(prog) {
+                None => (),
+                Some(ended_prog) => 
+                    match ended_prog.get(1) {
+                        None => (),
+                        Some(ep) => println!("{}", ep.as_str()),
+                    },
+            }
+        }
+    }
     Ok(())
 }
 
@@ -165,12 +203,12 @@ pub fn run(dir: &str) -> Result<(), Error> {
         let content = &query_a_task(task)?;
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
-        let slc = (&code).as_str().ok_or(Error::UnexpectedFormat)?;
+        let slc = code.as_str().ok_or(Error::UnexpectedFormat)?;
 
         // let mut path = dir.to_owned() + "/";
         let path = dir.to_owned() 
                        + "/" 
-                       + &str::replace(&task.title, " ", "_");
+                       + &str::replace(&task.title, " ", "-");
         write_code(path, slc)?;
     }
     Ok(())

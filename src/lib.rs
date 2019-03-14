@@ -2,19 +2,25 @@ extern crate reqwest;
 extern crate url;
 extern crate serde;
 extern crate serde_json;
-extern crate regex;
-
 #[macro_use]
 extern crate serde_derive;
 
 
+
+
+
+
 use std::fs;
-use std::iter::*;
+use std::io;
 use std::io::prelude::*;
 use serde_json::{Value};
 use serde::Deserialize;
-use regex::Regex;
 
+use crate::error::Error;
+
+mod write_code_onig;
+mod write_code_regex;
+mod error;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TaskData {
@@ -27,57 +33,6 @@ struct Query {
     categorymembers: Vec<TaskData>
 }
 
-#[derive(Debug)]
-pub enum Error {
-    /// Something went wrong with the HTTP request to the API.
-    Http(reqwest::Error),
- 
-    /// There was a problem parsing the API response into JSON.
-    Io(std::io::Error),
- 
-    /// There was a problem parsing the API response into JSON.
-    ParseUrl(url::ParseError),
- 
-    /// There was a problem parsing the API response into JSON.
-    SerdeJson(serde_json::Error),
- 
-    /// There was a problem parsing the API response into JSON.
-    Regex(regex::Error),
-
-    /// Unexpected JSON format from response
-    UnexpectedFormat,
-}
- 
-impl From<reqwest::Error> for Error {
-    fn from(error: reqwest::Error) -> Self {
-        Error::Http(error)
-    }
-}
- 
-impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
-        Error::Io(error)
-    }
-}
- 
-impl From<url::ParseError> for Error {
-    fn from(error: url::ParseError) -> Self {
-        Error::ParseUrl(error)
-    }
-}
- 
-impl From<serde_json::Error> for Error {
-    fn from(error: serde_json::Error) -> Self {
-        Error::SerdeJson(error)
-    }
-}
- 
-impl From<regex::Error> for Error {
-    fn from(error: regex::Error) -> Self {
-        Error::Regex(error)
-    }
-}
- 
 fn query_api(url: url::Url) -> Result<String, Error> {
     let mut response = (reqwest::get(url.as_str()))?;
     let mut body = String::new();
@@ -160,51 +115,6 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
     }
 }
 
-fn write_code(dir: String, code: &str) -> Result<(), Error>
-{
-
-    fs::DirBuilder::new().recursive(true).create(&dir)?;
-
-    /* 
-     * awkward use of regex splits due to limited regex 
-     * functionality - no lookaheads.  
-     */
-
-    // split task up at "=={{header|" intervals.
-    let header_re = Regex::new(r"(?m)^==\{\{[Hh]eader\|")?;
-    let mut head_it = header_re.split(code);
-    head_it.next();
-    for head in head_it {
-        // language should follow immediately
-        let language_re = Regex::new(r"([^\}]*)\}\}==")?;
-        match language_re.captures(head) {
-            None => (),
-            Some(lang) => 
-                match lang.get(1) {
-                    None => (),
-                    Some(l) => println!("{}", l.as_str()),
-                },
-        }
-        // split again at "<lang .... >" intervals.
-        let prog_re = Regex::new(r"(?m)<lang[^\n]*>")?;
-        let mut prog_it = prog_re.split(head);
-        prog_it.next();
-        for prog in prog_it {
-            // split again at "</lang>" to isolate program.
-            let prog_end_re = Regex::new(r"(?ms)(.*)</lang>")?;
-            match prog_end_re.captures(prog) {
-                None => (),
-                Some(ended_prog) => 
-                    match ended_prog.get(1) {
-                        None => (),
-                        Some(ep) => println!("{}", ep.as_str()),
-                    },
-            }
-        }
-    }
-    Ok(())
-}
-
 pub fn run(dir: &str) -> Result<(), Error> {
     let all_tasks = query_all_tasks()?;
 
@@ -218,7 +128,17 @@ pub fn run(dir: &str) -> Result<(), Error> {
         let path = dir.to_owned() 
                        + "/" 
                        + &str::replace(&task.title, " ", "-");
-        write_code(path, slc)?;
+
+        {
+            let log_regex = fs::File::create(String::from(dir) + "_regex")?;
+            let mut writer_regex = io::BufWriter::new(log_regex);
+            write_code_regex::write_code(&mut writer_regex, &path, slc)?;
+        }
+        {
+            let log_onig = fs::File::create(String::from(dir) + "_onig")?;
+            let mut writer_onig = io::BufWriter::new(log_onig);
+            write_code_onig::write_code(&mut writer_onig, &path, slc)?;
+        }
     }
     Ok(())
 }

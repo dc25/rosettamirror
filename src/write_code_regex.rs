@@ -17,12 +17,12 @@ pub fn write_code<T: Write>(log: &mut BufWriter<T>, dir: &String, code: &str) ->
      */
 
     // split task up at "=={{header|" intervals.
-    let header_re = Regex::new(r"(?m)^==\{\{[Hh]eader\|")?;
+    let header_re = Regex::new(r"(?m)^===*\{\{[Hh]eader\|")?;
     let mut head_it = header_re.split(code);
     head_it.next();
     for head in head_it {
         // language should follow immediately
-        let language_re = Regex::new(r"([^\}]*)\}\}==")?;
+        let language_re = Regex::new(r"([^\}]*)\}\}")?;
         match language_re.captures(head) {
             None => (),
             Some(lang) => 
@@ -32,12 +32,12 @@ pub fn write_code<T: Write>(log: &mut BufWriter<T>, dir: &String, code: &str) ->
                 },
         }
         // split again at "<lang .... >" intervals.
-        let prog_re = Regex::new(r"(?m)<lang[^\n]*>")?;
+        let prog_re = Regex::new(r"(?mi)<lang[^>\n]*>")?;
         let mut prog_it = prog_re.split(head);
         prog_it.next();
         for prog in prog_it {
             // split again at "</lang>" to isolate program.
-            let prog_end_re = Regex::new(r"(?ms)(.*)</lang>")?;
+            let prog_end_re = Regex::new(r"(?msi)(.*?)</lang *>")?;
             match prog_end_re.captures(prog) {
                 None => (),
                 Some(ended_prog) => 

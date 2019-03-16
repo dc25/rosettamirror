@@ -122,20 +122,20 @@ fn vec_compare(va: &[u8], vb: &[u8]) -> bool {
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let all_tasks = query_all_tasks()?;
 
-    let log_regex = fs::File::create(String::from(dir) + "_regex")?;
-    //let log_regex = Vec::new();
-    let mut writer_regex = io::BufWriter::new(log_regex);
-
-    let log_onig = fs::File::create(String::from(dir) + "_onig")?;
-    // let log_onig = Vec::new();
-    let mut writer_onig = io::BufWriter::new(log_onig);
-
     for task in all_tasks.iter() {
         let task_name = String::from("Task: ") + &task.title;
 
-        println!("{}", task_name);
-        writeln!(writer_onig.by_ref(), "{}", task_name)?;
-        writeln!(writer_regex.by_ref(), "{}", task_name)?;
+        //let log_regex = fs::File::create(String::from(dir) + "_regex")?;
+        let log_regex = Vec::new();
+        let mut writer_regex = io::BufWriter::new(log_regex);
+
+        // let log_onig = fs::File::create(String::from(dir) + "_onig")?;
+        let log_onig = Vec::new();
+        let mut writer_onig = io::BufWriter::new(log_onig);
+
+
+        writeln!(&mut writer_onig.by_ref(), "{}", task_name)?;
+        writeln!(&mut writer_regex.by_ref(), "{}", task_name)?;
         // if task.title == "Conditional structures" {
             let content = &query_a_task(task)?;
             let v: Value = serde_json::from_str(content)?;
@@ -153,7 +153,9 @@ pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
             {
                 write_code_onig::write_code(&mut writer_onig, &path, slc)?;
             }
-			// let s = writer_onig.into_inner()?;
+			let onig_out = writer_onig.into_inner()?;
+			let regex_out = writer_regex.into_inner()?;
+            println!("{}: {}", task_name, if vec_compare(&onig_out, &regex_out) { "Pass" } else { "Fail" });
            
             // let passFail = if vec_compare(&log_onig, &log_regex) {"Pass"} else {"Fail"};
             // writeln!(writer_regex, "{} {}", task_name, &passFail)?;

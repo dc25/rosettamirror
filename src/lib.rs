@@ -8,10 +8,11 @@ extern crate serde_derive;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
+use std::error::Error;
 use serde_json::{Value};
 use serde::Deserialize;
 
-use crate::error::Error;
+use crate::error::RosettaError;
 
 mod write_code_onig;
 mod write_code_regex;
@@ -28,7 +29,7 @@ struct Query {
     categorymembers: Vec<TaskData>
 }
 
-fn query_api(url: url::Url) -> Result<String, Error> {
+fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
     let mut response = (reqwest::get(url.as_str()))?;
     let mut body = String::new();
     response.read_to_string(&mut body)?;
@@ -36,7 +37,7 @@ fn query_api(url: url::Url) -> Result<String, Error> {
     Ok(body)
 }
  
-fn query_tasks(cont_args: &Vec<(String, String)>) -> Result<String, Error> {
+fn query_tasks(cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     let query_pairs 
@@ -54,7 +55,7 @@ fn query_tasks(cont_args: &Vec<(String, String)>) -> Result<String, Error> {
     Ok(json)
 }
  
-fn query_a_task(task: &TaskData) -> Result<String, Error> {
+fn query_a_task(task: &TaskData) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     let tp = &task.pageid.to_string();
@@ -73,7 +74,7 @@ fn query_a_task(task: &TaskData) -> Result<String, Error> {
     Ok(json)
 }
 
-fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
+fn query_all_tasks() -> Result<Vec<TaskData>, Box<dyn Error>> {
 
     let mut all_tasks: Vec<TaskData> = vec![];
 
@@ -92,14 +93,14 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Error> {
 
             let cont_object = cont_value
                                   .as_object()
-                                  .ok_or(Error::UnexpectedFormat)?;
+                                  .ok_or(RosettaError::UnexpectedFormat)?;
 
             let to_cont_pair = |ca: (&String, &Value)| { 
-                let cp1 = ca.1.as_str().ok_or(Error::UnexpectedFormat)?;
+                let cp1 = ca.1.as_str().ok_or(RosettaError::UnexpectedFormat)?;
                 Ok((ca.0.clone(), cp1.to_owned()))
             };
 
-            let cont_args_result : Result<Vec<(String,String)>, Error> 
+            let cont_args_result : Result<Vec<(String,String)>, Box<dyn Error>>
                     = cont_object 
                         .iter().map(to_cont_pair).collect();
 
@@ -118,19 +119,19 @@ fn vec_compare(va: &[u8], vb: &[u8]) -> bool {
 }
 
 
-pub fn run(dir: &str) -> Result<(), Error> {
+pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let all_tasks = query_all_tasks()?;
+
+    let log_regex = fs::File::create(String::from(dir) + "_regex")?;
+    //let log_regex = Vec::new();
+    let mut writer_regex = io::BufWriter::new(log_regex);
+
+    let log_onig = fs::File::create(String::from(dir) + "_onig")?;
+    // let log_onig = Vec::new();
+    let mut writer_onig = io::BufWriter::new(log_onig);
 
     for task in all_tasks.iter() {
         let task_name = String::from("Task: ") + &task.title;
-
-        let log_regex = fs::File::create(String::from(dir) + "_regex")?;
-        //let log_regex = Vec::new();
-        let mut writer_regex = io::BufWriter::new(log_regex);
-
-        let log_onig = fs::File::create(String::from(dir) + "_onig")?;
-        // let log_onig = Vec::new();
-        let mut writer_onig = io::BufWriter::new(log_onig);
 
         println!("{}", task_name);
         writeln!(writer_onig.by_ref(), "{}", task_name)?;
@@ -139,7 +140,7 @@ pub fn run(dir: &str) -> Result<(), Error> {
             let content = &query_a_task(task)?;
             let v: Value = serde_json::from_str(content)?;
             let code = &v["query"]["pages"][0]["revisions"][0]["content"];
-            let slc = code.as_str().ok_or(Error::UnexpectedFormat)?;
+            let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
 
             // let mut path = dir.to_owned() + "/";
             let path = dir.to_owned() 

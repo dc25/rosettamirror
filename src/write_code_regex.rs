@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::Error;
 
 
-pub fn write_code<T: Write>(log: &mut BufWriter<T>, dir: &String, code: &str) -> Result<(), Error>
+pub fn write_code<T: Write>(log: &mut BufWriter<T>, dir: &String, code: &str) -> Result<(), Box<dyn Error>>
 {
 
     fs::DirBuilder::new().recursive(true).create(&dir)?;

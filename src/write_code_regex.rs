@@ -16,9 +16,12 @@ pub fn write_code<T: Write>(log: &mut BufWriter<T>, dir: &String, code: &str) ->
      * functionality - no lookaheads.  
      */
 
+    let re = Regex::new(r"(?m)<nowiki>.*?</nowiki>")?;
+    let code = re.replace_all(code, "REMOVEDNOWIKI");
+
     // split task up at "=={{header|" intervals.
     let header_re = Regex::new(r"(?m)^===*\{\{[Hh]eader\|")?;
-    let mut head_it = header_re.split(code);
+    let mut head_it = header_re.split(&code);
     head_it.next();
     for head in head_it {
         // language should follow immediately

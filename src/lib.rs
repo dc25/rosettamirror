@@ -5,8 +5,6 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
-use std::fs;
-use std::io;
 use std::str;
 use std::io::prelude::*;
 use std::error::Error;
@@ -16,7 +14,6 @@ use serde::Deserialize;
 use crate::error::RosettaError;
 
 mod write_code_onig;
-mod write_code_regex;
 mod error;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -112,68 +109,20 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Box<dyn Error>> {
     }
 }
 
-fn vec_compare(va: &[u8], vb: &[u8]) -> bool {
-    (va.len() == vb.len()) &&  // zip stops at the shortest
-     va.iter()
-       .zip(vb)
-       .all(|(a,b)| (a==b))
-}
-
-
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let all_tasks = query_all_tasks()?;
 
     for task in all_tasks.iter() {
-        let task_name = String::from("Task: ") + &task.title;
-
-        let log_regex = Vec::new();
-        let mut writer_regex = io::BufWriter::new(log_regex);
-
-        let log_onig = Vec::new();
-        let mut writer_onig = io::BufWriter::new(log_onig);
-
-
-        writeln!(&mut writer_onig.by_ref(), "{}", task_name)?;
-        writeln!(&mut writer_regex.by_ref(), "{}", task_name)?;
         let content = &query_a_task(task)?;
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
         let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
 
-        // let mut path = dir.to_owned() + "/";
         let path = dir.to_owned() 
                        + "/" 
                        + &str::replace(&task.title, " ", "-");
 
-        {
-            write_code_regex::write_code(&mut writer_regex, &path, slc)?;
-        }
-        {
-            write_code_onig::write_code(&mut writer_onig, &path, slc)?;
-        }
-        let onig_out = writer_onig.into_inner()?;
-        let regex_out = writer_regex.into_inner()?;
-        let passed =  vec_compare(&onig_out, &regex_out) ;
-        let grade =  if passed {"Pass"} else {"Fail"};
-        println!("{}: {}", task_name, grade);
-        if !passed {
-
-            let log_regex = fs::File::create(String::from(dir) + "_regex")?;
-            let mut writer_regex = io::BufWriter::new(log_regex);
-            let str_regex = str::from_utf8(&regex_out)?;
-            write!(writer_regex, "{}", str_regex)?;
-
-
-            let log_onig = fs::File::create(String::from(dir) + "_onig")?;
-            let mut writer_onig = io::BufWriter::new(log_onig);
-            let str_onig = str::from_utf8(&onig_out)?;
-            write!(writer_onig, "{}", str_onig)?;
-
-            let log_orig = fs::File::create(String::from(dir) + "_orig")?;
-            let mut writer_orig = io::BufWriter::new(log_orig);
-            write!(writer_orig, "{}", slc)?;
-
-        }
+        write_code_onig::write_code(&path, slc)?;
     }
     Ok(())
 }

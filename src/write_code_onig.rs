@@ -55,17 +55,15 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
 
         let program_code = header_match.at(2).ok_or(RosettaError::UnexpectedFormat)?;
 
-        let programs_it : onig::FindCaptures = program_re.captures_iter(program_code) ;
-        // let programs_it2 : std::iter::Map<onig::FindCaptures, Option<&str>> = programs_it
-        //                                           .map(|pm:std::ops::FnMut<(onig::find::Captures<'_>,)>| pm.at(1));
-        let programs_it2:Option<Vec<_>> = programs_it
-                                                  .map(|pm| pm.at(1)).collect();
+        let programs_opt : Option<Vec<_>> 
+                = program_re.captures_iter(program_code) 
+                            .map(|pm| pm.at(1))
+                            .collect();
                                                   
+        let programs: Vec<_> 
+                = programs_opt.ok_or(RosettaError::UnexpectedFormat)?;
 
-        let programs_it3: Result<Vec<_>,_> = programs_it2.ok_or(RosettaError::UnexpectedFormat);
-        let programs_it4 = programs_it3?;
-        // let programs:Result<Vec<&str>, Box<dyn Error>> = programs_it.collect()?;
-        for program in programs_it4.iter() {
+        for program in programs.iter() {
             let program_name =   program_dir.clone()
                                + "/" 
                                + &task_file_name 

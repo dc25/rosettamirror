@@ -42,7 +42,7 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
 
         let task_file_name = to_filename(task_name)?;
         let lang_file_name = to_filename(lang)?;
-        let extension = get_extension(lang)?;
+        let extension = get_extension(&lang_file_name)?;
 
         let program_dir = dir.to_owned() 
                            + "/" 

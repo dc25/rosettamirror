@@ -1,3 +1,19 @@
+use std::error::Error;
+
+
+
+
+
+
+pub struct Lang
+{
+}
+
+pub fn get_extension(lang: &str) -> Result<String, Box<dyn Error>>
+{
+    Ok("foo".to_owned())
+}
+/*
 0815/0815
 360-Assembly/360
 4D/4d
@@ -598,3 +614,4 @@ ZED/zed
 Zkl/zkl
 ZPL/zpl
 ZX-Spectrum-Basic/zx
+*/

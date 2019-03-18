@@ -15,6 +15,7 @@ use crate::error::RosettaError;
 
 mod write_code_onig;
 mod error;
+mod extensions;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TaskData {
@@ -118,11 +119,7 @@ pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
         let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
 
-        let path = dir.to_owned() 
-                       + "/" 
-                       + &str::replace(&task.title, " ", "-");
-
-        write_code_onig::write_code(&path, slc)?;
+        write_code_onig::write_code(dir, &task.title, slc)?;
     }
     Ok(())
 }

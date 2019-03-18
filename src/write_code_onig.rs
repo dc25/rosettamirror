@@ -62,33 +62,27 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
         let programs: Vec<_> 
                 = programs_opt.ok_or(RosettaError::UnexpectedFormat)?;
 
-        if programs.len() == 1 {
-            let program = programs[0];
+        let mut index: u32 = 1;
+        for program in programs.iter() {
+            let qualifier = 
+                if programs.len() == 1 {
+                    "".to_owned()
+                } else {
+                    "-".to_owned() + &index.to_string()
+                };
+
+            index = index+1;
+
             let program_name =   program_dir.clone()
                                + "/" 
                                + &task_file_name 
+                               + &qualifier
                                + "." 
                                + &extension;
 
             let f = File::create(&program_name)?;
             let mut f = BufWriter::new(f);
             f.write_all(program.as_bytes())?;
-        } else {
-            let mut index: u32 = 1;
-            for program in programs.iter() {
-                let program_name =   program_dir.clone()
-                                   + "/" 
-                                   + &task_file_name 
-                                   + "-"
-                                   + &index.to_string()
-                                   + "." 
-                                   + &extension;
-                index = index+1;
-
-                let f = File::create(&program_name)?;
-                let mut f = BufWriter::new(f);
-                f.write_all(program.as_bytes())?;
-            }
         }
     }
     Ok(())

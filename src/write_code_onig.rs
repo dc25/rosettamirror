@@ -52,27 +52,43 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
 
         fs::DirBuilder::new().recursive(true).create(&program_dir)?;
 
-
-        let program_code = header_match.at(2).ok_or(RosettaError::UnexpectedFormat)?;
+        let program_matches = header_match.at(2).ok_or(RosettaError::UnexpectedFormat)?;
 
         let programs_opt : Option<Vec<_>> 
-                = program_re.captures_iter(program_code) 
+                = program_re.captures_iter(program_matches) 
                             .map(|pm| pm.at(1))
                             .collect();
                                                   
         let programs: Vec<_> 
                 = programs_opt.ok_or(RosettaError::UnexpectedFormat)?;
 
-        for program in programs.iter() {
+        if programs.len() == 1 {
+            let program = programs[0];
             let program_name =   program_dir.clone()
                                + "/" 
                                + &task_file_name 
                                + "." 
                                + &extension;
 
-			let f = File::create(&program_name)?;
-			let mut f = BufWriter::new(f);
-			f.write_all(program.as_bytes())?;
+            let f = File::create(&program_name)?;
+            let mut f = BufWriter::new(f);
+            f.write_all(program.as_bytes())?;
+        } else {
+            let mut index: u32 = 1;
+            for program in programs.iter() {
+                let program_name =   program_dir.clone()
+                                   + "/" 
+                                   + &task_file_name 
+                                   + "-"
+                                   + &index.to_string()
+                                   + "." 
+                                   + &extension;
+                index = index+1;
+
+                let f = File::create(&program_name)?;
+                let mut f = BufWriter::new(f);
+                f.write_all(program.as_bytes())?;
+            }
         }
     }
     Ok(())

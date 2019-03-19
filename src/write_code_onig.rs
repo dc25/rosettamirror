@@ -2,11 +2,11 @@ use std::fs;
 use std::error::Error;
 use crate::RosettaError;
 use onig::Regex;
-use crate::extensions::*;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use unicode_normalization::*;
 use unicode_categories::*;
+use crate::extensions::*;
 
 fn strip_accents(s: String) -> String {
     // based on suggestions at ...

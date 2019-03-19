@@ -1,20 +1,38 @@
 use std::fs;
 use std::error::Error;
-use onig::Regex;
 use crate::RosettaError;
+use onig::Regex;
 use crate::extensions::*;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use unicode_normalization::*;
+use unicode_categories::*;
+
+fn strip_accents(s: String) -> String {
+    // based on suggestions at ...
+    // https://www.reddit.com/r/rust/comments/73vr1u/is_there_a_way_to_remove_accentspunctuation_from/
+    s.chars().nfd().filter(|s| !s.is_mark_nonspacing()).collect()
+}
+
+fn expand_ligatures(s: String) -> Result<String, Box<dyn Error>> 
+{
+    let re = Regex::new(r"\u00E6")?; // got unicode here: https://en.wiktionary.org/wiki/%C3%A6#Translingual
+    let s_out = re.replace_all(&s, "ae"); 
+    Ok(s_out)
+}
 
 fn to_filename(name: &str) -> Result <String, Box<dyn Error>> 
 {
-    let s:String = name.chars()
+    let stripped_name = strip_accents(name.to_owned());
+    let expanded_ligatures_name = expand_ligatures(stripped_name)?;
+    let s:String = expanded_ligatures_name.chars()
         .map(|x| match x { 
                     ' ' => '-', 
                     '/' => '-', 
                     '_' => '-', 
                     '(' => '-', 
                     ')' => '-', 
+                    '\u{00e9}' => 'e', 
                     _ => x}
             )
         .filter(|x| match x { 
@@ -23,7 +41,15 @@ fn to_filename(name: &str) -> Result <String, Box<dyn Error>>
                     _ => true}
                )
         .collect();
-    Ok(s)
+
+    // some clumsy artifacts
+    let sc = if s == "F-Sharp|F#" {
+                         "f-sharp".to_owned()
+                     } else
+                     {
+                         s
+                     };
+    Ok(sc)
 }
 
 

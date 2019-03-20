@@ -7,6 +7,7 @@ use std::io::{BufWriter, Write};
 use unicode_normalization::*;
 use unicode_categories::*;
 use crate::extensions::*;
+use maplit::hashmap;
 
 fn strip_accents(s: String) -> String {
     // based on suggestions at ...
@@ -21,10 +22,71 @@ fn expand_ligatures(s: String) -> Result<String, Box<dyn Error>>
     Ok(s_out)
 }
 
-fn to_filename(name: &str) -> Result <String, Box<dyn Error>> 
+fn trim_extra(s: String) -> Result<String, Box<dyn Error>> 
+{
+    let s0 = Regex::new(r"^\s+")?.replace_all(&s, ""); 
+    Ok(Regex::new(r"(\||,?\s+)$")?.replace_all(&s0, ""))
+}
+
+fn lang_to_filename(name: &str) -> Result <String, Box<dyn Error>> 
 {
     let stripped_name = strip_accents(name.to_owned());
     let expanded_ligatures_name = expand_ligatures(stripped_name)?;
+    let trimmed_extra = trim_extra(expanded_ligatures_name)?;
+    let s:String = trimmed_extra.chars()
+        .map(|x| match x { 
+                    ' ' => '-', 
+                    '/' => '-', 
+                    '_' => '-', 
+                    '(' => '-', 
+                    ')' => '-', 
+                    '*' => '-', 
+                    // '\u{00e9}' => 'e', 
+                    _ => x}
+            )
+        .filter(|x| match x { 
+                    // ',' => false,
+                    '\'' => false,
+                    '"' => false,
+                    _ => true}
+               )
+        .collect();
+
+    let special_cases = hashmap![
+            "Basic|QuickBasic" => "Basic-or-QuickBasic",
+            "C++|CPP" => "C++",
+            "C#|C-sharp" => "c-sharp",
+            "C#|CSharp" => "c-sharp",
+            "clojure|Clojure" => "Clojure",
+            "Clojure|Clojure" => "Clojure",
+            "Clojure|ClojureScript" => "Clojure-or-ClojureScript",
+            "c-sharp|C#" => "C-sharp",
+            "C-sharp|C#" => "C-sharp",
+            "Dylan.NET|Dylan.NET" => "Dylan.NET",
+            "F#|F-sharp" => "F-sharp",
+            "F-sharp|F#" => "F-sharp",
+            "F-Sharp|F#" => "F-sharp",
+            "Pascal|FreePascal" => "Pascal-or-FreePascal",
+            "PostScript|Post-Script" => "PostScript",
+            "Python|Python-3" => "Python-or-Python-3",
+    ];
+
+    let str_lang : &str = &s;
+
+    let ext : Option<String> = special_cases.get(str_lang)
+                             .map(|&st| st.to_owned());
+    match ext {
+        None => Ok(s),
+        Some(found) => Ok(found),
+    }
+}
+
+
+
+fn task_to_filename(name: &str) -> Result <String, Box<dyn Error>> 
+{
+    // let stripped_name = strip_accents(name.to_owned());
+    let expanded_ligatures_name = expand_ligatures(name.to_owned())?;
     let s:String = expanded_ligatures_name.chars()
         .map(|x| match x { 
                     ' ' => '-', 
@@ -32,24 +94,22 @@ fn to_filename(name: &str) -> Result <String, Box<dyn Error>>
                     '_' => '-', 
                     '(' => '-', 
                     ')' => '-', 
-                    '\u{00e9}' => 'e', 
+                    '*' => '-', 
+                    '!' => '-', 
+                    '–' => '-', 
+                    '\u{00e9}' => '-', // e with acute accent
+                    '\u{00e8}' => '-', // e with grave accent
                     _ => x}
             )
         .filter(|x| match x { 
-                    ',' => false,
+                    // ',' => false,
                     '\'' => false,
+                    '"' => false,
                     _ => true}
                )
         .collect();
 
-    // some clumsy artifacts
-    let sc = if s == "F-Sharp|F#" {
-                         "f-sharp".to_owned()
-                     } else
-                     {
-                         s
-                     };
-    Ok(sc)
+    Ok(s)
 }
 
 
@@ -57,18 +117,17 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
 {
     println!("TASK: {}", task_name);
 
-    let re = Regex::new(r"(?m)\<nowiki\>.*?\</nowiki\>")?;
-    let code = re.replace_all(code, "REMOVEDNOWIKI");
-
     let header_re = Regex::new(r"(?m)^===*\{\{[Hh]eader\|(.*?)\}\}(.*?)(?:\z|(?=^===*\{\{[Hh]eader))")?;
     let program_re = Regex::new(r"(?mi)<lang *(?: [^>]+)?>(.*?)<\/lang *>")?;
 
     for header_match in header_re.captures_iter(&code) {
         let lang = header_match.at(1).ok_or(RosettaError::UnexpectedFormat)?;
 
-        let task_file_name = to_filename(task_name)?;
-        let lang_file_name = to_filename(lang)?;
+        let task_file_name = task_to_filename(task_name)?;
+        let lang_file_name = lang_to_filename(lang)?;
         let extension = get_extension(&lang_file_name)?;
+
+        println!("LANG: {}", lang_file_name);
 
         let program_dir = dir.to_owned() 
                            + "/" 

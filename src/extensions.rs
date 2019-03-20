@@ -63,6 +63,7 @@ let language_suffixes= hashmap![
  "bacon" => "bacon",
  "basic256" => "basic256",
  "basic" => "basic",
+ "basic-or-quickbasic" => "basic",
  "batch-file" => "bat",
  "battlestar" => "battlestar",
  "bbc-basic" => "bbc",
@@ -102,6 +103,7 @@ let language_suffixes= hashmap![
  "clipper-xbase++" => "clipper",
  "clips" => "clips",
  "clojure" => "clj",
+ "clojure-or-clojurescript" => "clj",
  "cmake" => "cmake",
  "cobol" => "cobol",
  "cobra" => "cobra",
@@ -136,6 +138,7 @@ let language_suffixes= hashmap![
  "dup" => "dup",
  "dwscript" => "dw",
  "dylan" => "dylan",
+ "Dylan.NET-or-Dylan.NET" => "dylan",
  "ec" => "ec",
  "echolisp" => "echolisp",
  "ecl" => "ecl",
@@ -381,6 +384,7 @@ let language_suffixes= hashmap![
  "pare" => "pare",
  "pari-gp" => "pari",
  "pascal" => "pascal",
+ "pascal-or-freepascal" => "pascal",
  "pasm" => "pasm",
  "pdp-11-assembly" => "pdp-11",
  "peloton" => "peloton",
@@ -420,6 +424,7 @@ let language_suffixes= hashmap![
  "purity" => "purity",
  "pyret" => "pyret",
  "python" => "py",
+ "python-or-python-3" => "py",
  "qi" => "qi",
  "qore" => "qore",
  "q" => "q",
@@ -589,9 +594,12 @@ let language_suffixes= hashmap![
                              .ok_or(Box::new(RosettaError::UnrecognizedLanguage(lang.to_owned())));
     match ext {
         Err(_) => {
-                      // println!("Could not find extension for language: {}", lc_lang);
+                      println!("Could not find extension for language: {}", lc_lang);
                       Ok(lc_lang)
                   },
         Ok(_) => ext,
     }
 }
+
+
+

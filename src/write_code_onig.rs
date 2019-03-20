@@ -160,14 +160,16 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
 
             let program_name =   program_dir.clone()
                                + "/" 
-                               + &task_file_name 
+                               + &task_file_name.to_lowercase()
                                + &qualifier
                                + "." 
                                + &extension;
 
             let f = File::create(&program_name)?;
             let mut f = BufWriter::new(f);
-            f.write_all(program.as_bytes())?;
+            let trailing_spaces_re = Regex::new(r"(?m) +$")?; 
+            let no_trailing_program = trailing_spaces_re.replace_all(program, "");
+            f.write_all(no_trailing_program.as_bytes())?;
         }
     }
     Ok(())

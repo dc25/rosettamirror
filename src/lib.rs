@@ -17,15 +17,23 @@ mod write_code_onig;
 mod error;
 mod extensions;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 struct TaskData {
     pageid: u64,
     title: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Query {
+#[derive(Deserialize)]
+struct TaskQuery {
     categorymembers: Vec<TaskData>
+}
+
+
+impl TaskQuery {
+        pub fn new() -> TaskQuery {
+            let categorymembers = Vec::new();
+            TaskQuery{categorymembers}
+        }
 }
 
 fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
@@ -73,9 +81,9 @@ fn query_a_task(task: &TaskData) -> Result<String, Box<dyn Error>> {
     Ok(json)
 }
 
-fn query_all_tasks() -> Result<Vec<TaskData>, Box<dyn Error>> {
+fn query_all_tasks() -> Result<TaskQuery, Box<dyn Error>> {
 
-    let mut all_tasks: Vec<TaskData> = vec![];
+    let mut all_tasks = TaskQuery::new();
 
     let mut cont_args : Vec<(String, String)> 
                 = vec![("continue".to_owned(), "".to_owned())];
@@ -84,8 +92,8 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Box<dyn Error>> {
         let tasks_string = query_tasks(&cont_args)?;
         let tasks_value: Value = serde_json::from_str(&tasks_string)?;
         let query_value = &tasks_value["query"];
-        let query:Query = Query::deserialize(query_value)?;
-        all_tasks.extend(query.categorymembers);
+        let query:TaskQuery = TaskQuery::deserialize(query_value)?;
+        all_tasks.categorymembers.extend(query.categorymembers);
 
         let cont_value = &tasks_value["continue"];
         if cont_value.is_object() {
@@ -113,7 +121,7 @@ fn query_all_tasks() -> Result<Vec<TaskData>, Box<dyn Error>> {
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let all_tasks = query_all_tasks()?;
 
-    for task in all_tasks.iter() {
+    for task in all_tasks.categorymembers.iter() {
         let content = &query_a_task(task)?;
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];

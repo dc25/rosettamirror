@@ -36,6 +36,12 @@ impl TaskQuery {
         }
 }
 
+impl TaskQuery {
+        pub fn extend(self: &mut TaskQuery, other: TaskQuery) -> () {
+            self.categorymembers.extend(other.categorymembers)
+        }
+}
+
 fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
     let mut response = (reqwest::get(url.as_str()))?;
     let mut body = String::new();
@@ -44,7 +50,7 @@ fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
     Ok(body)
 }
  
-fn query_tasks(cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+fn query_category(cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     let query_pairs 
@@ -89,11 +95,11 @@ fn query_all_tasks() -> Result<TaskQuery, Box<dyn Error>> {
                 = vec![("continue".to_owned(), "".to_owned())];
 
     loop {
-        let tasks_string = query_tasks(&cont_args)?;
+        let tasks_string = query_category(&cont_args)?;
         let tasks_value: Value = serde_json::from_str(&tasks_string)?;
         let query_value = &tasks_value["query"];
         let query:TaskQuery = TaskQuery::deserialize(query_value)?;
-        all_tasks.categorymembers.extend(query.categorymembers);
+        all_tasks.extend(query);
 
         let cont_value = &tasks_value["continue"];
         if cont_value.is_object() {

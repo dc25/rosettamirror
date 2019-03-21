@@ -17,6 +17,11 @@ mod write_code_onig;
 mod error;
 mod extensions;
 
+pub trait CategoryQuery {
+    fn new() -> Self;
+    fn extend(self: &mut Self, other: Self);
+}
+
 #[derive(Deserialize)]
 struct TaskData {
     pageid: u64,
@@ -29,15 +34,14 @@ struct TaskQuery {
 }
 
 
-impl TaskQuery {
-        pub fn new() -> TaskQuery {
+impl CategoryQuery for TaskQuery {
+
+        fn new() -> TaskQuery {
             let categorymembers = Vec::new();
             TaskQuery{categorymembers}
         }
-}
 
-impl TaskQuery {
-        pub fn extend(self: &mut TaskQuery, other: TaskQuery) -> () {
+        fn extend(self: & mut TaskQuery, other: TaskQuery) -> () {
             self.categorymembers.extend(other.categorymembers)
         }
 }
@@ -87,9 +91,9 @@ fn query_a_task(task: &TaskData) -> Result<String, Box<dyn Error>> {
     Ok(json)
 }
 
-fn query_all_tasks() -> Result<TaskQuery, Box<dyn Error>> {
+fn query_all_tasks<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Error>> {
 
-    let mut all_tasks = TaskQuery::new();
+    let mut all_tasks = T::new();
 
     let mut cont_args : Vec<(String, String)> 
                 = vec![("continue".to_owned(), "".to_owned())];
@@ -97,8 +101,8 @@ fn query_all_tasks() -> Result<TaskQuery, Box<dyn Error>> {
     loop {
         let tasks_string = query_category(&cont_args)?;
         let tasks_value: Value = serde_json::from_str(&tasks_string)?;
-        let query_value = &tasks_value["query"];
-        let query:TaskQuery = TaskQuery::deserialize(query_value)?;
+        let query_value = tasks_value["query"].clone(); // why is this clone() necessary ?
+        let query:T = T::deserialize(query_value)?;
         all_tasks.extend(query);
 
         let cont_value = &tasks_value["continue"];
@@ -125,7 +129,7 @@ fn query_all_tasks() -> Result<TaskQuery, Box<dyn Error>> {
 }
 
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
-    let all_tasks = query_all_tasks()?;
+    let all_tasks : TaskQuery= query_all_tasks()?;
 
     for task in all_tasks.categorymembers.iter() {
         let content = &query_a_task(task)?;

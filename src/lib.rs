@@ -16,6 +16,7 @@ use crate::error::RosettaError;
 mod write_code_onig;
 mod error;
 mod extensions;
+mod languages;
 
 pub trait CategoryQuery {
     fn new() -> Self;
@@ -35,12 +36,12 @@ struct TaskQuery {
 }
 
 #[derive(Deserialize, Debug)]
-struct LanguageData {
+pub struct LanguageData {
     title: String
 }
 
 #[derive(Deserialize, Debug)]
-struct LanguageQuery {
+pub struct LanguageQuery {
     categorymembers: Vec<LanguageData>
 }
 
@@ -164,6 +165,8 @@ fn query_all<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Erro
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let all_tasks : TaskQuery= query_all()?;
     let all_languages : LanguageQuery = query_all()?;
+
+    let lan = languages::Languages::new(&all_languages);
 
     for task in all_tasks.categorymembers.iter() {
         let content = &query_a_task(task)?;

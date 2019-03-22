@@ -127,8 +127,6 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
         let lang_file_name = lang_to_filename(lang)?;
         let extension = get_extension(&lang_file_name)?;
 
-        println!("LANG: {}", lang_file_name);
-
         let program_dir = dir.to_owned() 
                            + "/" 
                            + &task_file_name

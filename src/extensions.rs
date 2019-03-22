@@ -594,7 +594,6 @@ let language_suffixes= hashmap![
                              .ok_or(Box::new(RosettaError::UnrecognizedLanguage(lang.to_owned())));
     match ext {
         Err(_) => {
-                      println!("Could not find extension for language: {}", lc_lang);
                       Ok(lc_lang)
                   },
         Ok(_) => ext,

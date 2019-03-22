@@ -20,6 +20,7 @@ mod extensions;
 pub trait CategoryQuery {
     fn new() -> Self;
     fn extend(self: &mut Self, other: Self);
+    fn query(cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>>;
 }
 
 #[derive(Deserialize)]
@@ -33,6 +34,16 @@ struct TaskQuery {
     categorymembers: Vec<TaskData>
 }
 
+#[derive(Deserialize, Debug)]
+struct LanguageData {
+    title: String
+}
+
+#[derive(Deserialize, Debug)]
+struct LanguageQuery {
+    categorymembers: Vec<LanguageData>
+}
+
 
 impl CategoryQuery for TaskQuery {
 
@@ -44,6 +55,27 @@ impl CategoryQuery for TaskQuery {
         fn extend(self: & mut TaskQuery, other: TaskQuery) -> () {
             self.categorymembers.extend(other.categorymembers)
         }
+
+        fn query(cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+          query_category(&"Programming_Tasks", cont_args)
+        }
+
+}
+
+impl CategoryQuery for LanguageQuery {
+
+        fn new() -> LanguageQuery {
+            let categorymembers = Vec::new();
+            LanguageQuery{categorymembers}
+        }
+
+        fn extend(self: & mut LanguageQuery, other: LanguageQuery) -> () {
+            self.categorymembers.extend(other.categorymembers)
+        }
+
+        fn query(cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+          query_category(&"Programming_Languages", cont_args)
+        }
 }
 
 fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
@@ -54,16 +86,17 @@ fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
     Ok(body)
 }
  
-fn query_category(cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+fn query_category(cname: &str, cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
+    let cspec = "Category:".to_owned() + cname;
     let query_pairs 
         = vec![ ("action", "query")
               , ("format", "json")
               , ("formatversion", "2")
               , ("list", "categorymembers")
               , ("cmlimit", "200")
-              , ("cmtitle", "Category:Programming_Tasks")
+              , ("cmtitle", &cspec)
               ];
 
     query.query_pairs_mut().extend_pairs(query_pairs.into_iter());
@@ -91,7 +124,7 @@ fn query_a_task(task: &TaskData) -> Result<String, Box<dyn Error>> {
     Ok(json)
 }
 
-fn query_all_tasks<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Error>> {
+fn query_all<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Error>> {
 
     let mut all_tasks = T::new();
 
@@ -99,7 +132,7 @@ fn query_all_tasks<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dy
                 = vec![("continue".to_owned(), "".to_owned())];
 
     loop {
-        let tasks_string = query_category(&cont_args)?;
+        let tasks_string = T::query(&cont_args)?;
         let tasks_value: Value = serde_json::from_str(&tasks_string)?;
         let query_value = tasks_value["query"].clone(); // why is this clone() necessary ?
         let query:T = T::deserialize(query_value)?;
@@ -129,7 +162,8 @@ fn query_all_tasks<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dy
 }
 
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
-    let all_tasks : TaskQuery= query_all_tasks()?;
+    let all_tasks : TaskQuery= query_all()?;
+    let all_languages : LanguageQuery = query_all()?;
 
     for task in all_tasks.categorymembers.iter() {
         let content = &query_a_task(task)?;

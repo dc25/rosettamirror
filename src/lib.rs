@@ -166,7 +166,7 @@ pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let all_tasks : TaskQuery= query_all()?;
     let all_languages : LanguageQuery = query_all()?;
 
-    let lan = languages::Languages::new(&all_languages);
+    let lan = languages::Languages::new(&all_languages)?;
 
     for task in all_tasks.categorymembers.iter() {
         let content = &query_a_task(task)?;
@@ -174,7 +174,7 @@ pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
         let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
 
-        write_code_onig::write_code(dir, &task.title, slc)?;
+        write_code_onig::write_code(&lan, dir, &task.title, slc)?;
     }
     Ok(())
 }

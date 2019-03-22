@@ -7,6 +7,7 @@ use std::io::{BufWriter, Write};
 use unicode_normalization::*;
 use unicode_categories::*;
 use crate::extensions::*;
+use crate::languages::*;
 use maplit::hashmap;
 
 fn strip_accents(s: String) -> String {
@@ -113,7 +114,7 @@ fn task_to_filename(name: &str) -> Result <String, Box<dyn Error>>
 }
 
 
-pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn Error>>
+pub fn write_code(lan: &Languages, dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn Error>>
 {
     println!("TASK: {}", task_name);
 
@@ -124,7 +125,7 @@ pub fn write_code(dir: &str, task_name: &str, code: &str) -> Result<(), Box<dyn 
         let lang = header_match.at(1).ok_or(RosettaError::UnexpectedFormat)?;
 
         let task_file_name = task_to_filename(task_name)?;
-        let lang_file_name = lang_to_filename(lang)?;
+        let lang_file_name = lan.lookup(lang_to_filename(lang)?);
         let extension = get_extension(&lang_file_name)?;
 
         let program_dir = dir.to_owned() 

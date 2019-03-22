@@ -22,4 +22,13 @@ impl Languages {
 
         Ok(Languages{names: name_map})
     }
+
+    pub fn lookup(self: &Self, name: String) -> String {
+        if let Some(found_name) = self.names.get(&name) {
+            found_name.to_string()
+        } else {
+            name
+        }
+    }
 }
+

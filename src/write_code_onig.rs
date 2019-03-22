@@ -29,12 +29,13 @@ fn trim_extra(s: String) -> Result<String, Box<dyn Error>>
     Ok(Regex::new(r"(\||,?\s+)$")?.replace_all(&s0, ""))
 }
 
-fn lang_to_filename(name: &str) -> Result <String, Box<dyn Error>> 
+fn lang_to_filename(lan: &Languages, name: &str) -> Result <String, Box<dyn Error>> 
 {
     let stripped_name = strip_accents(name.to_owned());
     let expanded_ligatures_name = expand_ligatures(stripped_name)?;
     let trimmed_extra = trim_extra(expanded_ligatures_name)?;
-    let s:String = trimmed_extra.chars()
+    let looked_up = lan.lookup(trimmed_extra);
+    let s:String = looked_up.chars()
         .map(|x| match x { 
                     ' ' => '-', 
                     '/' => '-', 
@@ -125,7 +126,7 @@ pub fn write_code(lan: &Languages, dir: &str, task_name: &str, code: &str) -> Re
         let lang = header_match.at(1).ok_or(RosettaError::UnexpectedFormat)?;
 
         let task_file_name = task_to_filename(task_name)?;
-        let lang_file_name = lan.lookup(lang_to_filename(lang)?);
+        let lang_file_name = lang_to_filename(lan, lang)?;
         let extension = get_extension(&lang_file_name)?;
 
         let program_dir = dir.to_owned() 

@@ -19,14 +19,17 @@ impl Languages {
                        .map(|n| trim_cat_re.replace(&n.title,""))
                        .map(|n| (n.to_lowercase(), n))
                        .collect();
+        println!("{:?}", name_map);
 
         Ok(Languages{names: name_map})
     }
 
     pub fn lookup(self: &Self, name: String) -> String {
-        if let Some(found_name) = self.names.get(&name) {
+        let lookup_name = name.to_lowercase();
+        if let Some(found_name) = self.names.get(&lookup_name.to_owned()) {
             found_name.to_string()
         } else {
+            println!("LANGUAGE NOT FOUND: {}", name);
             name
         }
     }

@@ -167,9 +167,14 @@ pub fn write_code(lan: &Languages, dir: &str, task_name: &str, code: &str) -> Re
 
             let f = File::create(&program_name)?;
             let mut f = BufWriter::new(f);
-            let trailing_spaces_re = Regex::new(r"(?m) +$")?; 
-            let no_trailing_program = trailing_spaces_re.replace_all(program, "");
-            f.write_all(no_trailing_program.as_bytes())?;
+
+            // Decided not to remove trailing (or any other) spaces.
+            // Who am I to say that trailing spaces are not 
+            // relevant to the meaning of a program?
+            
+            // let trailing_spaces_re = Regex::new(r"(?m) +$")?; 
+            // let no_trailing_program = trailing_spaces_re.replace_all(program, "");
+            f.write_all(program.as_bytes())?;
         }
     }
     Ok(())

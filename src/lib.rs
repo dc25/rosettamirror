@@ -15,7 +15,6 @@ use crate::error::RosettaError;
 
 mod write_code_onig;
 mod error;
-mod extensions;
 mod languages;
 
 pub trait CategoryQuery {

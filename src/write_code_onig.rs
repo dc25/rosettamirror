@@ -6,7 +6,6 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use unicode_normalization::*;
 use unicode_categories::*;
-use crate::extensions::*;
 use crate::languages::*;
 use maplit::hashmap;
 
@@ -127,7 +126,7 @@ pub fn write_code(lan: &Languages, dir: &str, task_name: &str, code: &str) -> Re
 
         let task_file_name = task_to_filename(task_name)?;
         let lang_file_name = lang_to_filename(lan, lang)?;
-        let extension = get_extension(&lang_file_name)?;
+        let extension = lan.lookup_extension(lang_file_name.clone());
 
         let program_dir = dir.to_owned() 
                            + "/" 

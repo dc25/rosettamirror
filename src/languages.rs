@@ -29,6 +29,7 @@ impl Languages {
             = langs.categorymembers
                        .iter()
                        .map(|n| trim_cat_re.replace(&n.title,""))
+                       .filter(|lang| lang != "Livecode") // should be "LiveCode" but both exist
                        .map(|n| (n.to_lowercase(), n))
                        .collect();
 
@@ -244,10 +245,11 @@ impl Languages {
     }
 
     pub fn lookup_extension(self: &Self, name: String) -> String {
-        if let Some(found_name) = self.extensions.get(&name.to_lowercase()) {
+        let lc_name = name.to_lowercase();
+        if let Some(found_name) = self.extensions.get(&lc_name) {
             found_name.clone()
         } else {
-            name
+            lc_name
         }
     }
 }

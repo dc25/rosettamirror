@@ -133,6 +133,7 @@ fn query_all<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Erro
 
     loop {
         let tasks_string = T::query(&cont_args)?;
+        println!("{:?}", tasks_string);
         let tasks_value: Value = serde_json::from_str(&tasks_string)?;
         let query_value = tasks_value["query"].clone(); // why is this clone() necessary ?
         let query:T = T::deserialize(query_value)?;

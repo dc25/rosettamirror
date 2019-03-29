@@ -155,7 +155,7 @@ pub fn write_code(lan: &Languages, dir: &str, task_name: &str, code: &str) -> Re
                     "-".to_owned() + &index.to_string()
                 };
 
-            index = index+1;
+            index+=1;
 
             let program_name =   program_dir.clone()
                                + "/" 

@@ -56,7 +56,7 @@ impl CategoryQuery for TaskQuery {
             self.categorymembers.extend(other.categorymembers)
         }
 
-        fn query(cont_args: &   [(String, String)]) -> Result<String, Box<dyn Error>> {
+        fn query(cont_args: &[(String, String)]) -> Result<String, Box<dyn Error>> {
           query_category(&"Programming_Tasks", cont_args)
         }
 
@@ -73,7 +73,7 @@ impl CategoryQuery for LanguageQuery {
             self.categorymembers.extend(other.categorymembers)
         }
 
-        fn query(cont_args: &   [(String, String)]) -> Result<String, Box<dyn Error>> {
+        fn query(cont_args: &[(String, String)]) -> Result<String, Box<dyn Error>> {
           query_category(&"Programming_Languages", cont_args)
         }
 }
@@ -86,8 +86,7 @@ fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
     Ok(body)
 }
  
-// fn query_category(cname: &str, cont_args: &Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
-   fn query_category(cname: &str, cont_args: &[   (String, String)]) -> Result<String, Box<dyn Error>> {
+fn query_category(cname: &str, cont_args: &[(String, String)]) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     let cspec = "Category:".to_owned() + cname;

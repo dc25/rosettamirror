@@ -23,7 +23,7 @@ mod languages;
 pub trait CategoryQuery {
     fn new() -> Self;
     fn extend(self: &mut Self, other: Self);
-    fn query(cont_args: impl Iterator<Item = (String,String)>) -> Result<String, Box<dyn Error>>;
+    fn partial_query(cont_args: impl Iterator<Item = (String,String)>) -> Result<String, Box<dyn Error>>;
 }
 
 #[derive(Deserialize, Debug)]
@@ -48,7 +48,7 @@ impl CategoryQuery for TaskQuery {
             self.categorymembers.extend(other.categorymembers)
         }
 
-        fn query(cont_args: impl Iterator<Item = (String,String)>) -> Result<String, Box<dyn Error>> {
+        fn partial_query(cont_args: impl Iterator<Item = (String,String)>) -> Result<String, Box<dyn Error>> {
           query_category(&"Programming_Tasks", cont_args)
         }
 
@@ -75,7 +75,7 @@ impl CategoryQuery for LanguageQuery {
             self.categorymembers.extend(other.categorymembers)
         }
 
-        fn query(cont_args: impl Iterator<Item = (String,String)>) -> Result<String, Box<dyn Error>> {
+        fn partial_query(cont_args: impl Iterator<Item = (String,String)>) -> Result<String, Box<dyn Error>> {
           query_category(&"Programming_Languages", cont_args)
         }
 }
@@ -133,7 +133,7 @@ fn query_a_task(task: &TaskData) -> Result<String, Box<dyn Error>> {
     Ok(json)
 }
 
-fn query_all<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Error>> {
+fn query<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Error>> {
 
     let mut all_tasks = T::new();
 
@@ -141,7 +141,7 @@ fn query_all<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Erro
                 vec![("continue".to_owned(), "".to_owned())];
 
     loop {
-        let tasks_string = T::query(cont_args.into_iter())?;
+        let tasks_string = T::partial_query(cont_args.into_iter())?;
         let tasks_value: Value = serde_json::from_str(&tasks_string)?;
         let query_value = tasks_value["query"].clone(); // why is this clone() necessary ?
         let query:T = T::deserialize(query_value)?;
@@ -158,7 +158,7 @@ fn query_all<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Erro
             cont_args = cont_value 
                             .as_object()
                             .ok_or(RosettaError::UnexpectedFormat)?
-                            .into_iter()
+                            .iter()
                             .map(to_cont_pair)
                             .collect::<Result<Vec<_>, _>>()?;
 
@@ -169,8 +169,8 @@ fn query_all<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Erro
 }
 
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
-    let all_tasks : TaskQuery= query_all()?;
-    let all_languages : LanguageQuery = query_all()?;
+    let all_tasks : TaskQuery= query()?;
+    let all_languages : LanguageQuery = query()?;
 
     let lan = languages::Languages::new(&all_languages)?;
 

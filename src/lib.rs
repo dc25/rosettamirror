@@ -122,7 +122,12 @@ fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
     Ok(json)
 }
 
-fn query<'a, T: Deserialize<'a> + Default + CategoryQuery>() -> Result<T, Box<dyn Error>> {
+fn query<'a
+        , T : Deserialize<'a> 
+            + Default 
+            + CategoryQuery
+        >  
+        () -> Result<T, Box<dyn Error>> {
 
     let mut complete : T = Default::default();
 

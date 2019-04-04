@@ -72,6 +72,29 @@ impl CategoryQuery for Languages {
     }
 }
 
+
+#[derive(Deserialize, Debug, Default)]
+pub struct Revision {
+    title: String,
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub struct Revisions {
+    recentchanges: Vec<Revision>,
+}
+
+impl CategoryQuery for Revisions {
+    fn concat(self: &mut Self, other: Self) {
+        self.recentchanges.extend(other.recentchanges)
+    }
+
+    fn partial_query(
+        cont_args: impl Iterator<Item = (String, String)>,
+    ) -> Result<String, Box<dyn Error>> {
+        query_category(&"Programming_Languages", cont_args)
+    }
+}
+
 fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
     let mut response = (reqwest::get(url.as_str()))?;
     let mut body = String::new();

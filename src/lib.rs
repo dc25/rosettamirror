@@ -21,7 +21,7 @@ mod write_code_onig;
 // https://stackoverflow.com/a/34745885/509928
 
 pub trait CategoryQuery {
-    fn extend(self: &mut Self, other: Self);
+    fn concat(self: &mut Self, other: Self);
     fn partial_query(
         cont_args: impl Iterator<Item = (String, String)>,
     ) -> Result<String, Box<dyn Error>>;
@@ -39,7 +39,7 @@ struct Tasks {
 }
 
 impl CategoryQuery for Tasks {
-    fn extend(self: &mut Tasks, other: Tasks) {
+    fn concat(self: &mut Tasks, other: Tasks) {
         self.categorymembers.extend(other.categorymembers)
     }
 
@@ -61,7 +61,7 @@ pub struct Languages {
 }
 
 impl CategoryQuery for Languages {
-    fn extend(self: &mut Languages, other: Languages) {
+    fn concat(self: &mut Languages, other: Languages) {
         self.categorymembers.extend(other.categorymembers)
     }
 
@@ -142,7 +142,7 @@ fn query<'a, T: Deserialize<'a> + Default + CategoryQuery>() -> Result<T, Box<dy
         let v: Value = serde_json::from_str(&s)?;
         let qv = &v["query"];
         let partial = T::deserialize(qv.clone())?; // why the clone?
-        complete.extend(partial);
+        complete.concat(partial);
 
         let cv = &v["continue"];
         if cv.is_object() {

@@ -21,28 +21,22 @@ mod languages;
 // https://stackoverflow.com/a/34745885/509928
 
 pub trait CategoryQuery {
-    fn new() -> Self;
     fn extend(self: &mut Self, other: Self);
     fn partial_query(cont_args: impl Iterator<Item = (String,String)>) -> Result<String, Box<dyn Error>>;
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 struct Task {
     pageid: u64,
     title: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 struct Tasks {
     categorymembers: Vec<Task>
 }
 
 impl CategoryQuery for Tasks {
-
-        fn new() -> Tasks {
-            let categorymembers = Vec::new();
-            Tasks{categorymembers}
-        }
 
         fn extend(self: & mut Tasks, other: Tasks) {
             self.categorymembers.extend(other.categorymembers)
@@ -54,22 +48,17 @@ impl CategoryQuery for Tasks {
 
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct Language {
     title: String
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct Languages {
     categorymembers: Vec<Language>
 }
 
 impl CategoryQuery for Languages {
-
-        fn new() -> Languages {
-            let categorymembers = Vec::new();
-            Languages{categorymembers}
-        }
 
         fn extend(self: & mut Languages, other: Languages) {
             self.categorymembers.extend(other.categorymembers)
@@ -133,9 +122,9 @@ fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
     Ok(json)
 }
 
-fn query<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Error>> {
+fn query<'a, T: Deserialize<'a> + Default + CategoryQuery>() -> Result<T, Box<dyn Error>> {
 
-    let mut complete = T::new();
+    let mut complete : T = Default::default();
 
     let mut cont_args = 
                 vec![("continue".to_owned(), "".to_owned())];

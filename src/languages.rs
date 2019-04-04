@@ -1,7 +1,7 @@
 use std::error::*;
 use std::collections::*;
 use onig::Regex;
-use crate::LanguageQuery;
+use crate::Languages;
 
 
 #[derive(Debug)]
@@ -15,14 +15,14 @@ impl LangExtension {
     }
 }
 
-pub struct Languages {
+pub struct Langs {
     names: HashMap<String, String>,  // map from lowercase name to language name of choice
     extensions: HashMap<String, String>  // map from lowercase name to language extension
 }
 
 
-impl Languages {
-    pub fn new(langs: &LanguageQuery) -> Result<Languages, Box<dyn Error>> {
+impl Langs {
+    pub fn new(langs: &Languages) -> Result<Langs, Box<dyn Error>> {
         let trim_cat_re = Regex::new(r"Category:")?;
 
         let name_map
@@ -232,7 +232,7 @@ impl Languages {
                         .map(|le| (le.0.to_lowercase(), le.1.clone()))
                         .collect();
 
-        Ok(Languages{names: name_map, extensions: extensions_map})
+        Ok(Langs{names: name_map, extensions: extensions_map})
     }
 
     pub fn lookup(self: &Self, name: String) -> String {

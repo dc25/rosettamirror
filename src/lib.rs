@@ -27,24 +27,24 @@ pub trait CategoryQuery {
 }
 
 #[derive(Deserialize, Debug)]
-struct TaskData {
+struct Task {
     pageid: u64,
     title: String,
 }
 
 #[derive(Deserialize, Debug)]
-struct TaskQuery {
-    categorymembers: Vec<TaskData>
+struct Tasks {
+    categorymembers: Vec<Task>
 }
 
-impl CategoryQuery for TaskQuery {
+impl CategoryQuery for Tasks {
 
-        fn new() -> TaskQuery {
+        fn new() -> Tasks {
             let categorymembers = Vec::new();
-            TaskQuery{categorymembers}
+            Tasks{categorymembers}
         }
 
-        fn extend(self: & mut TaskQuery, other: TaskQuery) {
+        fn extend(self: & mut Tasks, other: Tasks) {
             self.categorymembers.extend(other.categorymembers)
         }
 
@@ -55,23 +55,23 @@ impl CategoryQuery for TaskQuery {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct LanguageData {
+pub struct Language {
     title: String
 }
 
 #[derive(Deserialize, Debug)]
-pub struct LanguageQuery {
-    categorymembers: Vec<LanguageData>
+pub struct Languages {
+    categorymembers: Vec<Language>
 }
 
-impl CategoryQuery for LanguageQuery {
+impl CategoryQuery for Languages {
 
-        fn new() -> LanguageQuery {
+        fn new() -> Languages {
             let categorymembers = Vec::new();
-            LanguageQuery{categorymembers}
+            Languages{categorymembers}
         }
 
-        fn extend(self: & mut LanguageQuery, other: LanguageQuery) {
+        fn extend(self: & mut Languages, other: Languages) {
             self.categorymembers.extend(other.categorymembers)
         }
 
@@ -116,7 +116,7 @@ fn query_category(cname: &str, cont_args: impl Iterator<Item = (String,String)>)
     Ok(json)
 }
  
-fn query_a_task(task: &TaskData) -> Result<String, Box<dyn Error>> {
+fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     let query_pairs 
@@ -135,46 +135,44 @@ fn query_a_task(task: &TaskData) -> Result<String, Box<dyn Error>> {
 
 fn query<'a, T: Deserialize<'a> + CategoryQuery>() -> Result<T, Box<dyn Error>> {
 
-    let mut all_tasks = T::new();
+    let mut complete = T::new();
 
     let mut cont_args = 
                 vec![("continue".to_owned(), "".to_owned())];
 
     loop {
-        let tasks_string = T::partial_query(cont_args.into_iter())?;
-        let tasks_value: Value = serde_json::from_str(&tasks_string)?;
-        let query_value = tasks_value["query"].clone(); // why is this clone() necessary ?
-        let query:T = T::deserialize(query_value)?;
-        all_tasks.extend(query);
+        let s = T::partial_query(cont_args.into_iter())?;
+        let v: Value = serde_json::from_str(&s)?;
+        let qv = &v["query"]; 
+        let partial = T::deserialize(qv.clone())?;   // why the clone?
+        complete.extend(partial);
 
-        let cont_value = &tasks_value["continue"];
-        if cont_value.is_object() {
+        let cv = &v["continue"];
+        if cv.is_object() {
 
             let to_cont_pair = |ca: (&String, &Value)| -> Result<_, Box<dyn Error>> { 
                 let cp1 = ca.1.as_str().ok_or(RosettaError::UnexpectedFormat)?;
                 Ok((ca.0.clone(), cp1.to_owned()))
             };
 
-            cont_args = cont_value 
-                            .as_object()
-                            .ok_or(RosettaError::UnexpectedFormat)?
-                            .iter()
-                            .map(to_cont_pair)
-                            .collect::<Result<Vec<_>, _>>()?;
-
+            cont_args = cv.as_object()
+                          .ok_or(RosettaError::UnexpectedFormat)?
+                          .iter()
+                          .map(to_cont_pair)
+                          .collect::<Result<Vec<_>, _>>()?;
         } else {
-            return Ok(all_tasks);
+            return Ok(complete);
         }
     }
 }
 
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
-    let all_tasks : TaskQuery= query()?;
-    let all_languages : LanguageQuery = query()?;
+    let tasks : Tasks= query()?;
+    let languages : Languages = query()?;
 
-    let lan = languages::Languages::new(&all_languages)?;
+    let lan = languages::Langs::new(&languages)?;
 
-    for task in all_tasks.categorymembers.iter() {
+    for task in tasks.categorymembers.iter() {
         let content = &query_a_task(task)?;
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];

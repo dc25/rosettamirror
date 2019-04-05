@@ -18,12 +18,13 @@ mod languages;
 mod write_code_onig;
 
 // This post was helpful for getting impl Iterator argument working.
+// (Stopped using impl Iterator but leaving comment for now)
 // https://stackoverflow.com/a/34745885/509928
 
 pub trait CategoryQuery {
     fn concat(self: &mut Self, other: Self);
     fn partial_query(
-        cont_args: impl Iterator<Item = (String, String)>,
+        cont_args: Vec<(String, String)>,
     ) -> Result<String, Box<dyn Error>>;
 }
 
@@ -44,7 +45,7 @@ impl CategoryQuery for Tasks {
     }
 
     fn partial_query(
-        cont_args: impl Iterator<Item = (String, String)>,
+        cont_args: Vec<(String, String)>,
     ) -> Result<String, Box<dyn Error>> {
         query_category(&"Programming_Tasks", cont_args)
     }
@@ -66,7 +67,7 @@ impl CategoryQuery for Languages {
     }
 
     fn partial_query(
-        cont_args: impl Iterator<Item = (String, String)>,
+        cont_args: Vec<(String, String)>,
     ) -> Result<String, Box<dyn Error>> {
         query_category(&"Programming_Languages", cont_args)
     }
@@ -89,7 +90,7 @@ impl CategoryQuery for Revisions {
     }
 
     fn partial_query(
-        cont_args: impl Iterator<Item = (String, String)>,
+        cont_args: Vec<(String, String)>,
     ) -> Result<String, Box<dyn Error>> {
         query_category(&"Programming_Languages", cont_args)
     }
@@ -115,7 +116,7 @@ http  rosettacode.org/mw/api.php               \
 
 fn query_category(
     cname: &str,
-    cont_args: impl Iterator<Item = (String, String)>,
+    cont_args: Vec<(String, String)>,
 ) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
@@ -161,7 +162,7 @@ fn query<'a, T: Deserialize<'a> + Default + CategoryQuery>() -> Result<T, Box<dy
     let mut cont_args = vec![("continue".to_owned(), "".to_owned())];
 
     loop {
-        let s = T::partial_query(cont_args.into_iter())?;
+        let s = T::partial_query(cont_args)?;
         let v: Value = serde_json::from_str(&s)?;
         let qv = &v["query"];
         let partial = T::deserialize(qv.clone())?; // why the clone?

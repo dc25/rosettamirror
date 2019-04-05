@@ -21,7 +21,7 @@ mod write_code_onig;
 // (Stopped using impl Iterator but leaving comment for now)
 // https://stackoverflow.com/a/34745885/509928
 
-pub trait CategoryQuery {
+pub trait ContinuedQuery {
     fn concat(self: &mut Self, other: Self);
     fn partial_query(
         cont_args: Vec<(String, String)>,
@@ -39,7 +39,7 @@ struct Tasks {
     categorymembers: Vec<Task>,
 }
 
-impl CategoryQuery for Tasks {
+impl ContinuedQuery for Tasks {
     fn concat(self: &mut Tasks, other: Tasks) {
         self.categorymembers.extend(other.categorymembers)
     }
@@ -61,7 +61,7 @@ pub struct Languages {
     categorymembers: Vec<Language>,
 }
 
-impl CategoryQuery for Languages {
+impl ContinuedQuery for Languages {
     fn concat(self: &mut Languages, other: Languages) {
         self.categorymembers.extend(other.categorymembers)
     }
@@ -84,7 +84,7 @@ pub struct Revisions {
     recentchanges: Vec<Revision>,
 }
 
-impl CategoryQuery for Revisions {
+impl ContinuedQuery for Revisions {
     fn concat(self: &mut Self, other: Self) {
         self.recentchanges.extend(other.recentchanges)
     }
@@ -164,7 +164,7 @@ fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
     query_api(query_string_pairs)
 }
 
-fn query<'a, T: Deserialize<'a> + Default + CategoryQuery>() -> Result<T, Box<dyn Error>> {
+fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>() -> Result<T, Box<dyn Error>> {
     let mut complete: T = Default::default();
 
     let mut cont_args = vec![("continue".to_owned(), "".to_owned())];

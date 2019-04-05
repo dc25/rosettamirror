@@ -120,13 +120,14 @@ fn query_category(
 ) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
-    let query_pairs = [
+    let cat = "Category:".to_owned() + cname;
+    let query_pairs = vec![
         ("action", "query"),
         ("format", "json"),
         ("formatversion", "2"),
         ("list", "categorymembers"),
         ("cmlimit", "200"),
-        ("cmtitle", &("Category:".to_owned() + cname)),
+        ("cmtitle", &cat),
     ];
 
     query
@@ -140,13 +141,15 @@ fn query_category(
 fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
-    let query_pairs = [
+    let pid = task.pageid.to_string();
+
+    let query_pairs = vec![
         ("action", "query"),
         ("format", "json"),
         ("formatversion", "2"),
         ("prop", "revisions"),
         ("rvprop", "content"),
-        ("pageids", &task.pageid.to_string()),
+        ("pageids", &pid),
     ];
 
     query

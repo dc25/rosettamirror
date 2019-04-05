@@ -96,14 +96,18 @@ impl CategoryQuery for Revisions {
     }
 }
 
-fn query_api(url: url::Url) -> Result<String, Box<dyn Error>> {
-    let mut response = (reqwest::get(url.as_str()))?;
+
+fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+    let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
+
+    query
+        .query_pairs_mut()
+        .extend_pairs(args.into_iter());
+    let mut response = (reqwest::get(query.as_str()))?;
     let mut body = String::new();
     response.read_to_string(&mut body)?;
-
     Ok(body)
 }
-
 /*
 http  rosettacode.org/mw/api.php               \
         action==query                          \
@@ -118,10 +122,9 @@ fn query_category(
     cname: &str,
     cont_args: Vec<(String, String)>,
 ) -> Result<String, Box<dyn Error>> {
-    let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     let cat = "Category:".to_owned() + cname;
-    let query_pairs = vec![
+    let query_pairs: Vec<(&str, &str)> = vec![
         ("action", "query"),
         ("format", "json"),
         ("formatversion", "2"),
@@ -130,17 +133,18 @@ fn query_category(
         ("cmtitle", &cat),
     ];
 
-    query
-        .query_pairs_mut()
-        .extend_pairs(query_pairs.into_iter());
-    query.query_pairs_mut().extend_pairs(cont_args);
-    let json = query_api(query)?;
-    Ok(json)
+
+    let mut query_string_pairs: Vec<_> = 
+        query_pairs.iter()
+                   .map(|(s0,s1)| (s0.to_string(), s1.to_string()) )
+                   .collect();
+
+    query_string_pairs.extend(cont_args);
+
+    query_api(query_string_pairs)
 }
 
 fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
-    let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
-
     let pid = task.pageid.to_string();
 
     let query_pairs = vec![
@@ -152,11 +156,12 @@ fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
         ("pageids", &pid),
     ];
 
-    query
-        .query_pairs_mut()
-        .extend_pairs(query_pairs.into_iter());
-    let json = query_api(query)?;
-    Ok(json)
+    let query_string_pairs: Vec<_> = 
+        query_pairs.iter()
+                   .map(|(s0,s1)| (s0.to_string(), s1.to_string()) )
+                   .collect();
+
+    query_api(query_string_pairs)
 }
 
 fn query<'a, T: Deserialize<'a> + Default + CategoryQuery>() -> Result<T, Box<dyn Error>> {

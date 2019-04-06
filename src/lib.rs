@@ -76,6 +76,10 @@ impl ContinuedQuery for Languages {
 
 #[derive(Deserialize, Debug, Default)]
 pub struct Revision {
+    pageid: u64,
+    old_revid: u64,
+    rcid: u64,
+    revid: u64,
     title: String,
 }
 
@@ -92,7 +96,7 @@ impl ContinuedQuery for Revisions {
     fn partial_query(
         cont_args: Vec<(String, String)>,
     ) -> Result<String, Box<dyn Error>> {
-        query_category(&"Programming_Languages", cont_args)
+        query_recentchanges(cont_args)
     }
 }
 
@@ -108,15 +112,6 @@ fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     response.read_to_string(&mut body)?;
     Ok(body)
 }
-/*
-http  rosettacode.org/mw/api.php               \
-        action==query                          \
-        format==json                           \
-        list==recentchanges                    \
-        'rcprop==title|ids'                    \
-        rclimit==450                           \
-        continue==
-*/
 
 fn query_category(
     cname: &str,
@@ -143,6 +138,31 @@ fn query_category(
 
     query_api(query_string_pairs)
 }
+
+fn query_recentchanges(
+    cont_args: Vec<(String, String)>,
+) -> Result<String, Box<dyn Error>> {
+
+    let query_pairs: Vec<(&str, &str)> = vec![
+        ("action", "query"),
+        ("format", "json"),
+        ("formatversion", "2"),
+        ("list", "recentchanges"),
+        ("rcprop", "title|ids"),
+        ("rclimit", "200"),
+    ];
+
+
+    let mut query_string_pairs: Vec<_> = 
+        query_pairs.iter()
+                   .map(|(s0,s1)| (s0.to_string(), s1.to_string()) )
+                   .collect();
+
+    query_string_pairs.extend(cont_args);
+
+    query_api(query_string_pairs)
+}
+
 
 fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
     let pid = task.pageid.to_string();
@@ -198,6 +218,9 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>() -> Result<T, Box<d
 pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let tasks: Tasks = query()?;
     let languages: Languages = query()?;
+    let revisions: Revisions = query()?;
+    println!("{:?}", revisions);
+
 
     let lan = languages::Langs::new(&languages)?;
 

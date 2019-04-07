@@ -23,9 +23,7 @@ mod write_code_onig;
 
 pub trait ContinuedQuery {
     fn concat(self: &mut Self, other: Self);
-    fn partial_query(
-        cont_args: Vec<(String, String)>,
-    ) -> Result<String, Box<dyn Error>>;
+    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>>;
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -44,9 +42,7 @@ impl ContinuedQuery for Tasks {
         self.categorymembers.extend(other.categorymembers)
     }
 
-    fn partial_query(
-        cont_args: Vec<(String, String)>,
-    ) -> Result<String, Box<dyn Error>> {
+    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
         query_category(&"Programming_Tasks", cont_args)
     }
 }
@@ -66,13 +62,10 @@ impl ContinuedQuery for Languages {
         self.categorymembers.extend(other.categorymembers)
     }
 
-    fn partial_query(
-        cont_args: Vec<(String, String)>,
-    ) -> Result<String, Box<dyn Error>> {
+    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
         query_category(&"Programming_Languages", cont_args)
     }
 }
-
 
 #[derive(Deserialize, Debug, Default)]
 pub struct Revision {
@@ -93,31 +86,22 @@ impl ContinuedQuery for Revisions {
         self.recentchanges.extend(other.recentchanges)
     }
 
-    fn partial_query(
-        cont_args: Vec<(String, String)>,
-    ) -> Result<String, Box<dyn Error>> {
+    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
         query_recentchanges(cont_args)
     }
 }
 
-
 fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
-    query
-        .query_pairs_mut()
-        .extend_pairs(args.into_iter());
+    query.query_pairs_mut().extend_pairs(args.into_iter());
     let mut response = (reqwest::get(query.as_str()))?;
     let mut body = String::new();
     response.read_to_string(&mut body)?;
     Ok(body)
 }
 
-fn query_category(
-    cname: &str,
-    cont_args: Vec<(String, String)>,
-) -> Result<String, Box<dyn Error>> {
-
+fn query_category(cname: &str, cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let cat = "Category:".to_owned() + cname;
     let query_pairs: Vec<(&str, &str)> = vec![
         ("action", "query"),
@@ -128,21 +112,17 @@ fn query_category(
         ("cmtitle", &cat),
     ];
 
-
-    let mut query_string_pairs: Vec<_> = 
-        query_pairs.iter()
-                   .map(|(s0,s1)| (s0.to_string(), s1.to_string()) )
-                   .collect();
+    let mut query_string_pairs: Vec<_> = query_pairs
+        .iter()
+        .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+        .collect();
 
     query_string_pairs.extend(cont_args);
 
     query_api(query_string_pairs)
 }
 
-fn query_recentchanges(
-    cont_args: Vec<(String, String)>,
-) -> Result<String, Box<dyn Error>> {
-
+fn query_recentchanges(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let query_pairs: Vec<(&str, &str)> = vec![
         ("action", "query"),
         ("format", "json"),
@@ -152,17 +132,15 @@ fn query_recentchanges(
         ("rclimit", "200"),
     ];
 
-
-    let mut query_string_pairs: Vec<_> = 
-        query_pairs.iter()
-                   .map(|(s0,s1)| (s0.to_string(), s1.to_string()) )
-                   .collect();
+    let mut query_string_pairs: Vec<_> = query_pairs
+        .iter()
+        .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+        .collect();
 
     query_string_pairs.extend(cont_args);
 
     query_api(query_string_pairs)
 }
-
 
 fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
     let pid = task.pageid.to_string();
@@ -176,10 +154,10 @@ fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
         ("pageids", &pid),
     ];
 
-    let query_string_pairs: Vec<_> = 
-        query_pairs.iter()
-                   .map(|(s0,s1)| (s0.to_string(), s1.to_string()) )
-                   .collect();
+    let query_string_pairs: Vec<_> = query_pairs
+        .iter()
+        .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+        .collect();
 
     query_api(query_string_pairs)
 }
@@ -220,7 +198,6 @@ pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
     let languages: Languages = query()?;
     let revisions: Revisions = query()?;
     println!("{:?}", revisions);
-
 
     let lan = languages::Langs::new(&languages)?;
 

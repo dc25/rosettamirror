@@ -193,7 +193,7 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>() -> Result<T, Box<d
     }
 }
 
-pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
+pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
     let tasks: Tasks = query()?;
     let languages: Languages = query()?;
     let revisions: Revisions = query()?;
@@ -207,7 +207,7 @@ pub fn run(dir: &str) -> Result<(), Box<dyn Error>> {
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
         let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
 
-        write_code_onig::write_code(&lan, dir, &task.title, slc)?;
+        write_code_onig::write_code(&lan, directory, &task.title, slc)?;
     }
     Ok(())
 }

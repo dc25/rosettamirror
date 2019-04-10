@@ -24,7 +24,6 @@ mod write_code_onig;
 
 pub trait ContinuedQuery {
     fn concat(self: &mut Self, other: Self);
-    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -43,9 +42,6 @@ impl ContinuedQuery for Tasks {
         self.categorymembers.extend(other.categorymembers)
     }
 
-    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
-        query_category(&"Programming_Tasks", cont_args)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -63,9 +59,6 @@ impl ContinuedQuery for Languages {
         self.categorymembers.extend(other.categorymembers)
     }
 
-    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
-        query_category(&"Programming_Languages", cont_args)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
@@ -86,10 +79,6 @@ pub struct Revisions {
 impl ContinuedQuery for Revisions {
     fn concat(self: &mut Self, other: Self) {
         self.recentchanges.extend(other.recentchanges)
-    }
-
-    fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
-        query_recentchanges(cont_args)
     }
 }
 
@@ -121,12 +110,6 @@ fn make_category_query_args(cname: &str) -> Vec<(String,String)>
         .collect()
 }
 
-fn query_category(cname: &str, cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
-    let mut query_string_pairs = make_category_query_args(cname);
-    query_string_pairs.extend(cont_args);
-    query_api(query_string_pairs)
-}
-
 fn make_recentchanges_query_args() -> Vec<(String,String)>
 {
     let query_pairs: Vec<(&str, &str)> = vec![
@@ -142,14 +125,6 @@ fn make_recentchanges_query_args() -> Vec<(String,String)>
         .iter()
         .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
         .collect()
-}
-
-
-fn query_recentchanges(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
-    let mut query_string_pairs = make_recentchanges_query_args();
-    query_string_pairs.extend(cont_args);
-
-    query_api(query_string_pairs)
 }
 
 
@@ -172,18 +147,15 @@ fn make_task_query_args( task: &Task) -> Vec<(String,String)>
         .collect()
 }
 
-fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
-    let query_string_pairs = make_task_query_args(task);
-    query_api(query_string_pairs)
-}
-
-fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>() -> Result<T, Box<dyn Error>> {
+fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(query_args: Vec<(String, String)>) -> Result<T, Box<dyn Error>> {
     let mut complete: T = Default::default();
 
     let mut cont_args = vec![("continue".to_owned(), "".to_owned())];
 
     loop {
-        let s = T::partial_query(cont_args)?;
+        let mut ac = query_args.clone();
+        ac.extend(cont_args);
+        let s = query_api(ac)?;
         let v: Value = serde_json::from_str(&s)?;
         let qv = &v["query"];
         let partial = T::deserialize(qv.clone())?; // why the clone?
@@ -209,30 +181,14 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>() -> Result<T, Box<d
 }
 
 pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
-    let tasks: Tasks = query()?;
-    let languages: Languages = query()?;
-    let revisions: Revisions = query()?;
-
-
-    {
-        let rfo = File::create("revisions")?;
-        let mut rbo = BufWriter::new(rfo);
-        let rso : String = serde_json::to_string(&revisions)?;
-        rbo.write_all(rso.as_bytes())?;
-
-        let rfi = File::open("revisions")?;
-        let mut rbi = BufReader::new(rfi);
-        let mut rsi = String::new();
-        rbi.read_to_string(&mut rsi)?;
-        let v: Value = serde_json::from_str(&rsi)?;
-        let revi = Revisions::deserialize(v)?;
-
-    }
+    let _revisions: Revisions = query(make_recentchanges_query_args())?;
+    let tasks: Tasks = query(make_category_query_args("Programming_Tasks"))?;
+    let languages: Languages = query(make_category_query_args("Programming_Languages"))?;
 
     let lan = languages::Langs::new(&languages)?;
 
     for task in tasks.categorymembers.iter() {
-        let content = &query_a_task(task)?;
+        let content = &query_api(make_task_query_args(task))?;
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
         let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;

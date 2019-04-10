@@ -8,7 +8,8 @@ extern crate serde_derive;
 use serde::Deserialize;
 use serde_json::Value;
 use std::error::Error;
-use std::io::prelude::*;
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Write, Read};
 use std::str;
 
 use crate::error::RosettaError;
@@ -26,13 +27,13 @@ pub trait ContinuedQuery {
     fn partial_query(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>>;
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct Task {
     pageid: u64,
     title: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct Tasks {
     categorymembers: Vec<Task>,
 }
@@ -47,12 +48,12 @@ impl ContinuedQuery for Tasks {
     }
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Language {
     title: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Languages {
     categorymembers: Vec<Language>,
 }
@@ -67,16 +68,17 @@ impl ContinuedQuery for Languages {
     }
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub struct Revision {
     pageid: u64,
     old_revid: u64,
     rcid: u64,
     revid: u64,
+    timestamp: String,
     title: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub struct Revisions {
     recentchanges: Vec<Revision>,
 }
@@ -128,7 +130,7 @@ fn query_recentchanges(cont_args: Vec<(String, String)>) -> Result<String, Box<d
         ("format", "json"),
         ("formatversion", "2"),
         ("list", "recentchanges"),
-        ("rcprop", "title|ids"),
+        ("rcprop", "title|ids|timestamp"),
         ("rclimit", "200"),
     ];
 
@@ -197,7 +199,22 @@ pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
     let tasks: Tasks = query()?;
     let languages: Languages = query()?;
     let revisions: Revisions = query()?;
-    println!("{:?}", revisions);
+
+
+    {
+        let rfo = File::create("revisions")?;
+        let mut rbo = BufWriter::new(rfo);
+        let rso : String = serde_json::to_string(&revisions)?;
+        rbo.write_all(rso.as_bytes())?;
+
+        let rfi = File::open("revisions")?;
+        let mut rbi = BufReader::new(rfi);
+        let mut rsi = String::new();
+        rbi.read_to_string(&mut rsi)?;
+        let v: Value = serde_json::from_str(&rsi)?;
+        let revi = Revisions::deserialize(v)?;
+
+    }
 
     let lan = languages::Langs::new(&languages)?;
 

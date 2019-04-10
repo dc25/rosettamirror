@@ -103,7 +103,8 @@ fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     Ok(body)
 }
 
-fn query_category(cname: &str, cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+fn make_category_query_args(cname: &str) -> Vec<(String,String)>
+{
     let cat = "Category:".to_owned() + cname;
     let query_pairs: Vec<(&str, &str)> = vec![
         ("action", "query"),
@@ -114,17 +115,20 @@ fn query_category(cname: &str, cont_args: Vec<(String, String)>) -> Result<Strin
         ("cmtitle", &cat),
     ];
 
-    let mut query_string_pairs: Vec<_> = query_pairs
+    query_pairs
         .iter()
         .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-        .collect();
+        .collect()
+}
 
+fn query_category(cname: &str, cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+    let mut query_string_pairs = make_category_query_args(cname);
     query_string_pairs.extend(cont_args);
-
     query_api(query_string_pairs)
 }
 
-fn query_recentchanges(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+fn make_recentchanges_query_args() -> Vec<(String,String)>
+{
     let query_pairs: Vec<(&str, &str)> = vec![
         ("action", "query"),
         ("format", "json"),
@@ -134,17 +138,23 @@ fn query_recentchanges(cont_args: Vec<(String, String)>) -> Result<String, Box<d
         ("rclimit", "200"),
     ];
 
-    let mut query_string_pairs: Vec<_> = query_pairs
+    query_pairs
         .iter()
         .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-        .collect();
+        .collect()
+}
 
+
+fn query_recentchanges(cont_args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
+    let mut query_string_pairs = make_recentchanges_query_args();
     query_string_pairs.extend(cont_args);
 
     query_api(query_string_pairs)
 }
 
-fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
+
+fn make_task_query_args( task: &Task) -> Vec<(String,String)>
+{
     let pid = task.pageid.to_string();
 
     let query_pairs = vec![
@@ -156,11 +166,14 @@ fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
         ("pageids", &pid),
     ];
 
-    let query_string_pairs: Vec<_> = query_pairs
+    query_pairs
         .iter()
         .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-        .collect();
+        .collect()
+}
 
+fn query_a_task(task: &Task) -> Result<String, Box<dyn Error>> {
+    let query_string_pairs = make_task_query_args(task);
     query_api(query_string_pairs)
 }
 

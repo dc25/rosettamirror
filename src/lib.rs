@@ -17,10 +17,6 @@ mod error;
 mod languages;
 mod write_code_onig;
 
-// This post was helpful for getting impl Iterator argument working.
-// (Stopped using impl Iterator but leaving comment for now)
-// https://stackoverflow.com/a/34745885/509928
-
 pub trait ContinuedQuery {
     fn concat(self: &mut Self, other: Self);
 }
@@ -99,6 +95,10 @@ fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     Ok(body)
 }
 
+fn to_string_pair(s:&(&str, &str)) -> (String, String) {
+    (s.0.to_string(), s.1.to_string())
+}
+
 fn make_category_query_args(cname: &str) -> Vec<(String, String)> {
     [
         ("action", "query"),
@@ -108,9 +108,7 @@ fn make_category_query_args(cname: &str) -> Vec<(String, String)> {
         ("cmlimit", "200"),
         ("cmtitle", &("Category:".to_owned() + cname)),
     ]
-    .iter()
-    .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-    .collect()
+    .iter().map(to_string_pair).collect()
 }
 
 fn make_recentchanges_query_args() -> Vec<(String, String)> {
@@ -122,9 +120,7 @@ fn make_recentchanges_query_args() -> Vec<(String, String)> {
         ("rcprop", "title|ids|timestamp"),
         ("rclimit", "200"),
     ]
-    .iter()
-    .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-    .collect()
+    .iter().map(to_string_pair).collect()
 }
 
 fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
@@ -136,9 +132,12 @@ fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
         ("rvprop", "content"),
         ("pageids", &task.pageid.to_string()),
     ]
-    .iter()
-    .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-    .collect()
+    .iter().map(to_string_pair).collect()
+}
+
+fn to_cont_pair (ca: (&String, &Value)) -> Result<(String,String), Box<dyn Error>> {
+    let cp1 = ca.1.as_str().ok_or(RosettaError::UnexpectedFormat)?;
+    Ok((ca.0.clone(), cp1.to_owned()))
 }
 
 fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
@@ -159,11 +158,6 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
 
         let cv = &v["continue"];
         if cv.is_object() {
-            let to_cont_pair = |ca: (&String, &Value)| -> Result<_, Box<dyn Error>> {
-                let cp1 = ca.1.as_str().ok_or(RosettaError::UnexpectedFormat)?;
-                Ok((ca.0.clone(), cp1.to_owned()))
-            };
-
             cont_args = cv
                 .as_object()
                 .ok_or(RosettaError::UnexpectedFormat)?

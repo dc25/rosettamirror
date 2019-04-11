@@ -8,7 +8,7 @@ extern crate serde_derive;
 use serde::Deserialize;
 use serde_json::Value;
 use std::error::Error;
-use std::io::{Read};
+use std::io::Read;
 use std::str;
 
 use crate::error::RosettaError;
@@ -40,7 +40,6 @@ impl ContinuedQuery for Tasks {
     fn concat(self: &mut Tasks, other: Tasks) {
         self.categorymembers.extend(other.categorymembers)
     }
-
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -57,7 +56,6 @@ impl ContinuedQuery for Languages {
     fn concat(self: &mut Languages, other: Languages) {
         self.categorymembers.extend(other.categorymembers)
     }
-
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
@@ -78,10 +76,10 @@ pub struct Revisions {
 impl Revisions {
     fn latest(self: &Self) -> Result<String, Box<dyn Error>> {
         self.recentchanges
-                .iter()
-                .max_by(|x, y| x.timestamp.cmp(&y.timestamp))
-                .map(|r| r.timestamp.clone())
-                .ok_or(Box::new(RosettaError::UnexpectedFormat))
+            .iter()
+            .max_by(|x, y| x.timestamp.cmp(&y.timestamp))
+            .map(|r| r.timestamp.clone())
+            .ok_or(Box::new(RosettaError::UnexpectedFormat))
     }
 }
 
@@ -101,8 +99,7 @@ fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     Ok(body)
 }
 
-fn make_category_query_args(cname: &str) -> Vec<(String,String)>
-{
+fn make_category_query_args(cname: &str) -> Vec<(String, String)> {
     [
         ("action", "query"),
         ("format", "json"),
@@ -110,27 +107,27 @@ fn make_category_query_args(cname: &str) -> Vec<(String,String)>
         ("list", "categorymembers"),
         ("cmlimit", "200"),
         ("cmtitle", &("Category:".to_owned() + cname)),
-    ].iter()
-     .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-     .collect()
+    ]
+    .iter()
+    .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+    .collect()
 }
 
-fn make_recentchanges_query_args() -> Vec<(String,String)>
-{
-    [ ("action", "query")
-    , ("format", "json")
-    , ("formatversion", "2")
-    , ("list", "recentchanges")
-    , ("rcprop", "title|ids|timestamp")
-    , ("rclimit", "200")
-    ].iter()
-     .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-     .collect()
+fn make_recentchanges_query_args() -> Vec<(String, String)> {
+    [
+        ("action", "query"),
+        ("format", "json"),
+        ("formatversion", "2"),
+        ("list", "recentchanges"),
+        ("rcprop", "title|ids|timestamp"),
+        ("rclimit", "200"),
+    ]
+    .iter()
+    .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+    .collect()
 }
 
-
-fn make_task_query_args( task: &Task) -> Vec<(String,String)>
-{
+fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
     [
         ("action", "query"),
         ("format", "json"),
@@ -138,12 +135,15 @@ fn make_task_query_args( task: &Task) -> Vec<(String,String)>
         ("prop", "revisions"),
         ("rvprop", "content"),
         ("pageids", &task.pageid.to_string()),
-    ].iter()
-     .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-     .collect()
+    ]
+    .iter()
+    .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+    .collect()
 }
 
-fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(query_args: Vec<(String, String)>) -> Result<T, Box<dyn Error>> {
+fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
+    query_args: Vec<(String, String)>,
+) -> Result<T, Box<dyn Error>> {
     let mut complete: T = Default::default();
 
     let mut cont_args = vec![("continue".to_owned(), "".to_owned())];

@@ -99,7 +99,7 @@ fn to_string_pair(s:&(&str, &str)) -> (String, String) {
     (s.0.to_string(), s.1.to_string())
 }
 
-fn make_category_query_args(cname: &str) -> Vec<(String, String)> {
+fn make_category_query_args(cname: &str, latest: &str) -> Vec<(String, String)> {
     [
         ("action", "query"),
         ("format", "json"),
@@ -107,6 +107,8 @@ fn make_category_query_args(cname: &str) -> Vec<(String, String)> {
         ("list", "categorymembers"),
         ("cmlimit", "200"),
         ("cmtitle", &("Category:".to_owned() + cname)),
+        ("cmsort", "timestamp"),
+        ("cmend", latest),
     ]
     .iter().map(to_string_pair).collect()
 }
@@ -174,8 +176,8 @@ pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
     let revisions: Revisions = query(make_recentchanges_query_args())?;
     let latest = revisions.latest()?;
     println!("LATEST = {}", latest);
-    let tasks: Tasks = query(make_category_query_args("Programming_Tasks"))?;
-    let languages: Languages = query(make_category_query_args("Programming_Languages"))?;
+    let tasks: Tasks = query(make_category_query_args("Programming_Tasks", &latest))?;
+    let languages: Languages = query(make_category_query_args("Programming_Languages",&latest))?;
 
     let lan = languages::Langs::new(&languages)?;
 

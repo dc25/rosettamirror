@@ -8,8 +8,7 @@ extern crate serde_derive;
 use serde::Deserialize;
 use serde_json::Value;
 use std::error::Error;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Write, Read};
+use std::io::{Read};
 use std::str;
 
 use crate::error::RosettaError;
@@ -76,6 +75,16 @@ pub struct Revisions {
     recentchanges: Vec<Revision>,
 }
 
+impl Revisions {
+    fn latest(self: &Self) -> Result<String, Box<dyn Error>> {
+        self.recentchanges
+                .iter()
+                .max_by(|x, y| x.timestamp.cmp(&y.timestamp))
+                .map(|r| r.timestamp.clone())
+                .ok_or(Box::new(RosettaError::UnexpectedFormat))
+    }
+}
+
 impl ContinuedQuery for Revisions {
     fn concat(self: &mut Self, other: Self) {
         self.recentchanges.extend(other.recentchanges)
@@ -94,57 +103,44 @@ fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
 
 fn make_category_query_args(cname: &str) -> Vec<(String,String)>
 {
-    let cat = "Category:".to_owned() + cname;
-    let query_pairs: Vec<(&str, &str)> = vec![
+    [
         ("action", "query"),
         ("format", "json"),
         ("formatversion", "2"),
         ("list", "categorymembers"),
         ("cmlimit", "200"),
-        ("cmtitle", &cat),
-    ];
-
-    query_pairs
-        .iter()
-        .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-        .collect()
+        ("cmtitle", &("Category:".to_owned() + cname)),
+    ].iter()
+     .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+     .collect()
 }
 
 fn make_recentchanges_query_args() -> Vec<(String,String)>
 {
-    let query_pairs: Vec<(&str, &str)> = vec![
-        ("action", "query"),
-        ("format", "json"),
-        ("formatversion", "2"),
-        ("list", "recentchanges"),
-        ("rcprop", "title|ids|timestamp"),
-        ("rclimit", "200"),
-    ];
-
-    query_pairs
-        .iter()
-        .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-        .collect()
+    [ ("action", "query")
+    , ("format", "json")
+    , ("formatversion", "2")
+    , ("list", "recentchanges")
+    , ("rcprop", "title|ids|timestamp")
+    , ("rclimit", "200")
+    ].iter()
+     .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+     .collect()
 }
 
 
 fn make_task_query_args( task: &Task) -> Vec<(String,String)>
 {
-    let pid = task.pageid.to_string();
-
-    let query_pairs = vec![
+    [
         ("action", "query"),
         ("format", "json"),
         ("formatversion", "2"),
         ("prop", "revisions"),
         ("rvprop", "content"),
-        ("pageids", &pid),
-    ];
-
-    query_pairs
-        .iter()
-        .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
-        .collect()
+        ("pageids", &task.pageid.to_string()),
+    ].iter()
+     .map(|(s0, s1)| (s0.to_string(), s1.to_string()))
+     .collect()
 }
 
 fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(query_args: Vec<(String, String)>) -> Result<T, Box<dyn Error>> {
@@ -181,7 +177,9 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(query_args: Vec<(Str
 }
 
 pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
-    let _revisions: Revisions = query(make_recentchanges_query_args())?;
+    let revisions: Revisions = query(make_recentchanges_query_args())?;
+    let latest = revisions.latest()?;
+    println!("LATEST = {}", latest);
     let tasks: Tasks = query(make_category_query_args("Programming_Tasks"))?;
     let languages: Languages = query(make_category_query_args("Programming_Languages"))?;
 

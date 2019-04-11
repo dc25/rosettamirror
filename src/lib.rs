@@ -133,11 +133,12 @@ fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
         ("prop", "revisions"),
         ("rvprop", "content"),
         ("pageids", &task.pageid.to_string()),
+        ("continue", ""),
     ]
     .iter().map(to_string_pair).collect()
 }
 
-fn to_cont_pair (ca: (&String, &Value)) -> Result<(String,String), Box<dyn Error>> {
+fn to_continue_pair (ca: (&String, &Value)) -> Result<(String,String), Box<dyn Error>> {
     let cp1 = ca.1.as_str().ok_or(RosettaError::UnexpectedFormat)?;
     Ok((ca.0.clone(), cp1.to_owned()))
 }
@@ -164,7 +165,7 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
                 .as_object()
                 .ok_or(RosettaError::UnexpectedFormat)?
                 .iter()
-                .map(to_cont_pair)
+                .map(to_continue_pair)
                 .collect::<Result<Vec<_>, _>>()?;
         } else {
             return Ok(complete);
@@ -174,10 +175,9 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
 
 pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
     let revisions: Revisions = query(make_recentchanges_query_args())?;
-    let latest = revisions.latest()?;
-    println!("LATEST = {}", latest);
-    let tasks: Tasks = query(make_category_query_args("Programming_Tasks", &latest))?;
-    let languages: Languages = query(make_category_query_args("Programming_Languages",&latest))?;
+    let latest_timestamp = revisions.latest()?;
+    let tasks: Tasks = query(make_category_query_args("Programming_Tasks", &latest_timestamp))?;
+    let languages: Languages = query(make_category_query_args("Programming_Languages",&latest_timestamp))?;
 
     let lan = languages::Langs::new(&languages)?;
 
@@ -186,7 +186,6 @@ pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
         let v: Value = serde_json::from_str(content)?;
         let code = &v["query"]["pages"][0]["revisions"][0]["content"];
         let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
-
         write_code_onig::write_code(&lan, directory, &task.title, slc)?;
     }
     Ok(())

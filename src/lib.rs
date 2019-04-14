@@ -8,8 +8,9 @@ extern crate serde_derive;
 use serde::Deserialize;
 use serde_json::Value;
 use std::error::Error;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+// use std::fs::File;
+// use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::Read;
 use std::str;
 
 use crate::error::RosettaError;
@@ -189,13 +190,6 @@ fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<()
     Ok(())
 }
 
-fn task_written(lan: &languages::Langs, directory: &str, task: &Task) -> bool {
-    match write_task(lan, directory, task) {
-        Ok(_) => true,
-        Err(_) => false,
-    }
-}
-
 pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
     let revisions: Revisions = query(make_recentchanges_query_args())?;
     /*
@@ -230,7 +224,8 @@ pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
     let _written_tasks: Vec<_> = tasks
         .categorymembers
         .iter()
-        .filter(|task| task_written(&lan, directory, task))
+        .filter(|task| write_task(&lan, directory, task).is_ok())
         .collect();
+
     Ok(())
 }

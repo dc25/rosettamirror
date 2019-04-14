@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Write, Read};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::str;
 
 use crate::error::RosettaError;
@@ -96,7 +96,7 @@ fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     Ok(body)
 }
 
-fn to_string_pair(s:&(&str, &str)) -> (String, String) {
+fn to_string_pair(s: &(&str, &str)) -> (String, String) {
     (s.0.to_string(), s.1.to_string())
 }
 
@@ -111,7 +111,9 @@ fn make_category_query_args(cname: &str, latest: &str) -> Vec<(String, String)> 
         ("cmsort", "timestamp"),
         ("cmend", latest),
     ]
-    .iter().map(to_string_pair).collect()
+    .iter()
+    .map(to_string_pair)
+    .collect()
 }
 
 fn make_recentchanges_query_args() -> Vec<(String, String)> {
@@ -123,7 +125,9 @@ fn make_recentchanges_query_args() -> Vec<(String, String)> {
         ("rcprop", "title|ids|timestamp"),
         ("rclimit", "200"),
     ]
-    .iter().map(to_string_pair).collect()
+    .iter()
+    .map(to_string_pair)
+    .collect()
 }
 
 fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
@@ -136,10 +140,12 @@ fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
         ("pageids", &task.pageid.to_string()),
         ("continue", ""),
     ]
-    .iter().map(to_string_pair).collect()
+    .iter()
+    .map(to_string_pair)
+    .collect()
 }
 
-fn to_continue_pair (ca: (&String, &Value)) -> Result<(String,String), Box<dyn Error>> {
+fn to_continue_pair(ca: (&String, &Value)) -> Result<(String, String), Box<dyn Error>> {
     let cp1 = ca.1.as_str().ok_or(RosettaError::UnexpectedFormat)?;
     Ok((ca.0.clone(), cp1.to_owned()))
 }
@@ -174,54 +180,57 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
     }
 }
 
-fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<(), Box<dyn Error>> 
-{
-        let content = &query_api(make_task_query_args(task))?;
-        let v: Value = serde_json::from_str(content)?;
-        let code = &v["query"]["pages"][0]["revisions"][0]["content"];
-        let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
-        write_code_onig::write_code(&lan, directory, &task.title, slc)?;
-        Ok(())
+fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<(), Box<dyn Error>> {
+    let content = &query_api(make_task_query_args(task))?;
+    let v: Value = serde_json::from_str(content)?;
+    let code = &v["query"]["pages"][0]["revisions"][0]["content"];
+    let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
+    write_code_onig::write_code(&lan, directory, &task.title, slc)?;
+    Ok(())
 }
 
-fn task_written(lan: &languages::Langs, directory: &str, task: &Task) -> bool
-{
+fn task_written(lan: &languages::Langs, directory: &str, task: &Task) -> bool {
     match write_task(lan, directory, task) {
         Ok(_) => true,
-        Err(_) => false
+        Err(_) => false,
     }
 }
 
 pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
     let revisions: Revisions = query(make_recentchanges_query_args())?;
-/*
-    {
-        let rfo = File::create("revisions")?;
-        let mut rbo = BufWriter::new(rfo);
-        let rso : String = serde_json::to_string(&revisions)?;
-        rbo.write_all(rso.as_bytes())?;
+    /*
+        {
+            let rfo = File::create("revisions")?;
+            let mut rbo = BufWriter::new(rfo);
+            let rso : String = serde_json::to_string(&revisions)?;
+            rbo.write_all(rso.as_bytes())?;
 
-        let rfi = File::open("revisions")?;
-        let mut rbi = BufReader::new(rfi);
-        let mut rsi = String::new();
-        rbi.read_to_string(&mut rsi)?;
-        let v: Value = serde_json::from_str(&rsi)?;
-        let _revi = Revisions::deserialize(v)?;
+            let rfi = File::open("revisions")?;
+            let mut rbi = BufReader::new(rfi);
+            let mut rsi = String::new();
+            rbi.read_to_string(&mut rsi)?;
+            let v: Value = serde_json::from_str(&rsi)?;
+            let _revi = Revisions::deserialize(v)?;
 
-    }
+        }
 
-*/
+    */
     let latest_timestamp = revisions.latest()?;
-    let tasks: Tasks = query(make_category_query_args("Programming_Tasks", &latest_timestamp))?;
-    let languages: Languages = query(make_category_query_args("Programming_Languages",&latest_timestamp))?;
+    let tasks: Tasks = query(make_category_query_args(
+        "Programming_Tasks",
+        &latest_timestamp,
+    ))?;
+    let languages: Languages = query(make_category_query_args(
+        "Programming_Languages",
+        &latest_timestamp,
+    ))?;
 
     let lan = languages::Langs::new(&languages)?;
 
-    let _written_tasks: Vec<_>  = tasks.categorymembers.iter()
-                                              .filter(|task| task_written(&lan, directory, task))
-                                              .collect();
+    let _written_tasks: Vec<_> = tasks
+        .categorymembers
+        .iter()
+        .filter(|task| task_written(&lan, directory, task))
+        .collect();
     Ok(())
 }
-
-
-

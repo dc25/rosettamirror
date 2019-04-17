@@ -175,16 +175,17 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
         complete.concat(partial);
 
         let cv = &v["continue"];
-        if cv.is_object() {
-            cont_args = cv
-                .as_object()
-                .ok_or(RosettaError::UnexpectedFormat)?
-                .iter()
-                .map(to_continue_pair)
-                .collect::<Result<Vec<_>, _>>()?;
-        } else {
+
+        if !cv.is_object() {
             return Ok(complete);
         }
+
+        cont_args = cv
+            .as_object()
+            .ok_or(RosettaError::UnexpectedFormat)?
+            .iter()
+            .map(to_continue_pair)
+            .collect::<Result<_,_>>()?;
     }
 }
 
@@ -202,34 +203,44 @@ fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<Wr
     Ok(WrittenTask{pageid:task.pageid, revid:rid})
 }
 
-pub fn run(directory: &str, _all: bool) -> Result<(), Box<dyn Error>> {
+fn write_and_tally_tasks(tasks: &Tasks, lan: &languages::Langs, tally_file_name: &str, directory: &str) -> Result<(), Box<dyn Error>> {
+    // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
+    let written_tasks: Vec<_> = tasks
+        .categorymembers
+        .iter()
+        .take(2)
+        .flat_map(|task| write_task(lan, directory, task))
+        .collect();
+
+    let tfo = File::create(tally_file_name)?;
+    let mut tbo = BufWriter::new(tfo);
+    let tso : String = serde_json::to_string(&written_tasks)?;
+    tbo.write_all(tso.as_bytes())?;
+    Ok(())
+}
+
+pub fn run(_all: bool) -> Result<(), Box<dyn Error>> {
     let revisions: Revisions = query(make_recentchanges_query_args())?;
 
     let latest_timestamp = revisions.latest()?;
-
-    let tasks: Tasks = query(make_category_query_args(
-        "Programming_Tasks",
-        &latest_timestamp,
-    ))?;
 
     let languages: Languages = query(make_category_query_args(
         "Programming_Languages",
         &latest_timestamp,
     ))?;
-
     let lan = languages::Langs::new(&languages)?;
 
-    // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
-    let written_tasks: Vec<_> = tasks
-        .categorymembers
-        .iter()
-        .flat_map(|task| write_task(&lan, directory, task))
-        .collect();
+    let tasks: Tasks = query(make_category_query_args(
+        "Programming_Tasks",
+        &latest_timestamp,
+    ))?;
+    write_and_tally_tasks(&tasks, &lan, "tasks", "Task")?;
 
-    let tfo = File::create("tasks")?;
-    let mut tbo = BufWriter::new(tfo);
-    let tso : String = serde_json::to_string(&written_tasks)?;
-    tbo.write_all(tso.as_bytes())?;
+    let draft_tasks: Tasks = query(make_category_query_args(
+        "Draft_Programming_Tasks",
+        &latest_timestamp,
+    ))?;
+    write_and_tally_tasks(&draft_tasks, &lan, "draft_tasks", "DraftTask")?;
 
     /*
     let rfi = File::open("revisions")?;

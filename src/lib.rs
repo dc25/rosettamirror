@@ -1,7 +1,3 @@
-extern crate reqwest;
-extern crate serde;
-extern crate serde_json;
-extern crate url;
 #[macro_use]
 extern crate serde_derive;
 
@@ -11,8 +7,6 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
 // use std::io::{BufReader, BufWriter, Read, Write};
-// use std::io::Read;
-use std::str;
 
 use crate::error::RosettaError;
 
@@ -212,10 +206,11 @@ fn write_and_tally_tasks(tasks: &Tasks, lan: &languages::Langs, tally_file_name:
         .flat_map(|task| write_task(lan, directory, task))
         .collect();
 
-    let tfo = File::create(tally_file_name)?;
-    let mut tbo = BufWriter::new(tfo);
-    let tso : String = serde_json::to_string(&written_tasks)?;
-    tbo.write_all(tso.as_bytes())?;
+    let f = File::create(tally_file_name)?;
+    let mut b = BufWriter::new(f);
+    let s : String = serde_json::to_string(&written_tasks)?;
+    b.write_all(s.as_bytes())?;
+
     Ok(())
 }
 

@@ -185,13 +185,13 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
 
 fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<WrittenTask, Box<dyn Error>> {
     let response = &query_api(make_task_query_args(task))?;
-    let v: Value = serde_json::from_str(response)?;
+    let v: &Value = &serde_json::from_str(response)?;
 
-    let content = v["query"]["pages"][0]["revisions"][0]["content"]
-                    .as_str().ok_or(RosettaError::UnexpectedFormat)?;
+    let v2 = &v["query"]["pages"][0]["revisions"][0];
 
-    let revid   = v["query"]["pages"][0]["revisions"][0]["revid"]
-                    .as_u64().ok_or(RosettaError::UnexpectedFormat)?;
+    let content = v2["content"].as_str().ok_or(RosettaError::UnexpectedFormat)?;
+
+    let revid   = v2["revid"].as_u64().ok_or(RosettaError::UnexpectedFormat)?;
 
     write_code_onig::write_code(&lan, directory, &task.title, content)?;
     Ok(WrittenTask{pageid:task.pageid, revid:revid})
@@ -208,7 +208,7 @@ fn write_and_tally_tasks(tasks: &Tasks, lan: &languages::Langs, tally_file_name:
 
     let f = File::create(tally_file_name)?;
     let mut b = BufWriter::new(f);
-    let s : String = serde_json::to_string(&written_tasks)?;
+    let s = serde_json::to_string(&written_tasks)?;
     b.write_all(s.as_bytes())?;
 
     Ok(())

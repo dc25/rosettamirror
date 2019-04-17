@@ -66,16 +66,6 @@ pub struct Revisions {
     recentchanges: Vec<Revision>,
 }
 
-impl Revisions {
-    fn latest(self: &Self) -> Result<String, Box<dyn Error>> {
-        self.recentchanges
-            .iter()
-            .max_by(|x, y| x.timestamp.cmp(&y.timestamp))
-            .map(|r| r.timestamp.clone())
-            .ok_or(Box::new(RosettaError::UnexpectedFormat))
-    }
-}
-
 impl ContinuedQuery for Revisions {
     fn concat(self: &mut Self, other: Self) {
         self.recentchanges.extend(other.recentchanges)
@@ -102,7 +92,7 @@ fn to_string_pair(s: &(&str, &str)) -> (String, String) {
     (s.0.to_string(), s.1.to_string())
 }
 
-fn make_category_query_args(cname: &str, latest: &str) -> Vec<(String, String)> {
+fn make_category_query_args(cname: &str) -> Vec<(String, String)> {
     [
         ("action", "query"),
         ("format", "json"),
@@ -110,8 +100,6 @@ fn make_category_query_args(cname: &str, latest: &str) -> Vec<(String, String)> 
         ("list", "categorymembers"),
         ("cmlimit", "200"),
         ("cmtitle", &("Category:".to_owned() + cname)),
-        ("cmsort", "timestamp"),
-        ("cmend", latest),
     ]
     .iter()
     .map(to_string_pair)
@@ -217,26 +205,22 @@ fn tally_tasks(written_tasks: Vec<WrittenTask>, tally_file_name: &str) -> Result
 }
 
 pub fn run(_all: bool) -> Result<(), Box<dyn Error>> {
-    let revisions: Revisions = query(make_recentchanges_query_args())?;
-
-    let latest_timestamp = revisions.latest()?;
+    // let saved_tasks = read_tasks("tasks");
+    let _revisions: Revisions = query(make_recentchanges_query_args())?;
 
     let languages: Languages = query(make_category_query_args(
         "Programming_Languages",
-        &latest_timestamp,
     ))?;
     let lan = languages::Langs::new(&languages)?;
 
     let tasks: Tasks = query(make_category_query_args(
         "Programming_Tasks",
-        &latest_timestamp,
     ))?;
     let written_tasks = write_tasks(&tasks, &lan, "Task");
     tally_tasks(written_tasks, "tasks")?;
 
     let draft_tasks: Tasks = query(make_category_query_args(
         "Draft_Programming_Tasks",
-        &latest_timestamp,
     ))?;
     let written_draft_tasks = write_tasks(&draft_tasks, &lan, "Task");
     tally_tasks(written_draft_tasks, "tasks")?;

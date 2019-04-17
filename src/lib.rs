@@ -184,17 +184,17 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
 }
 
 fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<WrittenTask, Box<dyn Error>> {
-    let content = &query_api(make_task_query_args(task))?;
-    let v: Value = serde_json::from_str(content)?;
+    let response = &query_api(make_task_query_args(task))?;
+    let v: Value = serde_json::from_str(response)?;
 
-    let code = &v["query"]["pages"][0]["revisions"][0]["content"];
-    let slc = code.as_str().ok_or(RosettaError::UnexpectedFormat)?;
+    let content = v["query"]["pages"][0]["revisions"][0]["content"]
+                    .as_str().ok_or(RosettaError::UnexpectedFormat)?;
 
-    let revid = &v["query"]["pages"][0]["revisions"][0]["revid"];
-    let rid = revid.as_u64().ok_or(RosettaError::UnexpectedFormat)?;
+    let revid   = v["query"]["pages"][0]["revisions"][0]["revid"]
+                    .as_u64().ok_or(RosettaError::UnexpectedFormat)?;
 
-    write_code_onig::write_code(&lan, directory, &task.title, slc)?;
-    Ok(WrittenTask{pageid:task.pageid, revid:rid})
+    write_code_onig::write_code(&lan, directory, &task.title, content)?;
+    Ok(WrittenTask{pageid:task.pageid, revid:revid})
 }
 
 fn write_and_tally_tasks(tasks: &Tasks, lan: &languages::Langs, tally_file_name: &str, directory: &str) -> Result<(), Box<dyn Error>> {

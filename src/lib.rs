@@ -197,20 +197,22 @@ fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<Wr
     Ok(WrittenTask{pageid:task.pageid, revid:revid})
 }
 
-fn write_and_tally_tasks(tasks: &Tasks, lan: &languages::Langs, tally_file_name: &str, directory: &str) -> Result<(), Box<dyn Error>> {
+fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<WrittenTask> {
     // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
-    let written_tasks: Vec<_> = tasks
+    tasks
         .categorymembers
         .iter()
         .take(2)
         .flat_map(|task| write_task(lan, directory, task))
-        .collect();
+        .collect()
+}
 
+fn tally_tasks(written_tasks: Vec<WrittenTask>, tally_file_name: &str) -> Result<(), Box<dyn Error>> {
+    // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
     let f = File::create(tally_file_name)?;
     let mut b = BufWriter::new(f);
     let s = serde_json::to_string(&written_tasks)?;
     b.write_all(s.as_bytes())?;
-
     Ok(())
 }
 
@@ -229,13 +231,15 @@ pub fn run(_all: bool) -> Result<(), Box<dyn Error>> {
         "Programming_Tasks",
         &latest_timestamp,
     ))?;
-    write_and_tally_tasks(&tasks, &lan, "tasks", "Task")?;
+    let written_tasks = write_tasks(&tasks, &lan, "Task");
+    tally_tasks(written_tasks, "tasks")?;
 
     let draft_tasks: Tasks = query(make_category_query_args(
         "Draft_Programming_Tasks",
         &latest_timestamp,
     ))?;
-    write_and_tally_tasks(&draft_tasks, &lan, "draft_tasks", "DraftTask")?;
+    let written_draft_tasks = write_tasks(&draft_tasks, &lan, "Task");
+    tally_tasks(written_draft_tasks, "tasks")?;
 
     /*
     let rfi = File::open("revisions")?;

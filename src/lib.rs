@@ -205,8 +205,8 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
     }
 }
 
-fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<WrittenTask, Box<dyn Error>> {
-    let response = &query_api(make_task_query_args(task))?;
+
+fn write_task_response( lan: &languages::Langs, directory: &str, response: &str) -> Result<WrittenTask, Box<dyn Error>> {
     let v: &Value = &serde_json::from_str(response)?;
     let p0 = &v["query"]["pages"][0]; 
 
@@ -219,14 +219,13 @@ fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<Wr
 
 fn write_revision(lan: &languages::Langs, directory: &str, revision: &Revision) -> Result<WrittenTask, Box<dyn Error>> {
     let response = &query_api(make_revision_query_args(revision))?;
-    let v: &Value = &serde_json::from_str(response)?;
-    let p0 = &v["query"]["pages"][0]; 
+    write_task_response(lan, directory, response)
+}
 
-    let pd = PageDetail::deserialize(p0)?; 
-    let rd = RevisionDetail::deserialize(&p0["revisions"][0])?; 
+fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<WrittenTask, Box<dyn Error>> {
+    let response = &query_api(make_task_query_args(task))?;
+    write_task_response(lan, directory, response)
 
-    write_code_onig::write_code(&lan, directory, &pd.title, &rd.content)?;
-    Ok(WrittenTask{pageid:pd.pageid, revid:rd.revid})
 }
 
 fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<WrittenTask> {
@@ -265,7 +264,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     ))?;
     let lan = languages::Langs::new(&languages)?;
     if let Ok(tasks) = read_task_tally("tasks") {
-
 
         let mut task_set : HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
 

@@ -95,6 +95,13 @@ struct WrittenTask {
     revid: u64,
 }
 
+impl WrittenTask {
+    fn new(pageid: u64, revid : u64 ) -> Self {
+        Self{pageid, revid}
+    }
+}
+
+
 fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
@@ -258,38 +265,46 @@ fn read_task_tally(tally_file_name: &str) -> Result<Vec<WrittenTask>, Box<dyn Er
     Ok(revi)
 }
 
+fn initialize_tasks(lan: &languages::Langs) -> Result<Vec<WrittenTask>, Box<dyn Error>>
+{
+    let tasks: Tasks = query(make_category_query_args(
+        "Programming_Tasks",
+    ))?;
+    Ok(write_tasks(&tasks, &lan, "Task"))
+}
+
+fn update_tasks(lan: &languages::Langs, tasks: &[WrittenTask]) -> Result<Vec<WrittenTask>, Box<dyn Error>>
+{
+    let mut task_set : HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
+
+    let revisions: Revisions = query(make_recentchanges_query_args())?;
+    let mut rc = revisions.recentchanges;
+    rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    let _unused = rc.iter().map(|rev| { 
+        let current_task = WrittenTask::new(rev.pageid, rev.revid);
+        let old_task = WrittenTask::new(rev.pageid, rev.old_revid);
+        if task_set.contains(&old_task) && !task_set.contains(&current_task) {
+            if let Ok(written_task) = write_revision(&lan, "Task", rev) {
+                task_set.remove(&old_task);
+                task_set.insert(written_task);
+            }
+        } 
+    }).collect::<Vec<_>>();
+    Ok(task_set.into_iter().collect::<Vec<WrittenTask>>())
+}
+       
 pub fn run() -> Result<(), Box<dyn Error>> {
     let languages: Languages = query(make_category_query_args(
         "Programming_Languages",
     ))?;
     let lan = languages::Langs::new(&languages)?;
-    if let Ok(tasks) = read_task_tally("tasks") {
-
-        let mut task_set : HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
-
-        let revisions: Revisions = query(make_recentchanges_query_args())?;
-        let mut rc = revisions.recentchanges;
-        rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-        let _results = rc.iter().map(|rev| { 
-            let current_task = WrittenTask {pageid:rev.pageid, revid:rev.revid};
-            let old_task = WrittenTask {pageid:rev.pageid, revid:rev.old_revid};
-            if task_set.contains(&old_task) && !task_set.contains(&current_task) {
-                if let Ok(written_task) = write_revision(&lan, "Task", rev) {
-                    println!("Updated {:?}", written_task);
-
-                    task_set.remove(&old_task);
-                    task_set.insert(written_task);
-                }
-            } 
-        }).collect::<Vec<_>>();
-        
-    } else {
-        let tasks: Tasks = query(make_category_query_args(
-            "Programming_Tasks",
-        ))?;
-        let written_tasks = write_tasks(&tasks, &lan, "Task");
-        write_task_tally(written_tasks, "tasks")?;
-    }
+    let written_tasks = 
+        if let Ok(tasks) = read_task_tally("tasks") {
+            update_tasks(&lan, &tasks)?
+        } else {
+            initialize_tasks(&lan)?
+        };
+    write_task_tally(written_tasks, "tasks")?;
     Ok(())
 }
 

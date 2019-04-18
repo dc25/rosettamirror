@@ -48,6 +48,8 @@ struct RevisionDetail<'a> {
     content: &'a str,
     revid: u64,
     timestamp: &'a str,
+    user: &'a str,
+    comment: &'a str,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -141,8 +143,25 @@ fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
         ("format", "json"),
         ("formatversion", "2"),
         ("prop", "revisions"),
-        ("rvprop", "content|ids|timestamp"),
+        ("rvprop", "content|ids|timestamp|user|comment"),
         ("pageids", &task.pageid.to_string()),
+        ("continue", ""),
+    ]
+    .iter()
+    .map(to_string_pair)
+    .collect()
+}
+
+fn make_revision_query_args(revision: &Revision) -> Vec<(String, String)> {
+    [
+        ("action", "query"),
+        ("format", "json"),
+        ("formatversion", "2"),
+        ("prop", "revisions"),
+        ("rvprop", "content|ids|timestamp|user|comment"),
+        ("pageids", &revision.pageid.to_string()),
+        ("rvstartid", &revision.revid.to_string()),
+        ("rvlimit", "1"),
         ("continue", ""),
     ]
     .iter()
@@ -198,6 +217,18 @@ fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<Wr
     Ok(WrittenTask{pageid:pd.pageid, revid:rd.revid})
 }
 
+fn write_revision(lan: &languages::Langs, directory: &str, revision: &Revision) -> Result<WrittenTask, Box<dyn Error>> {
+    let response = &query_api(make_revision_query_args(revision))?;
+    let v: &Value = &serde_json::from_str(response)?;
+    let p0 = &v["query"]["pages"][0]; 
+
+    let pd = PageDetail::deserialize(p0)?; 
+    let rd = RevisionDetail::deserialize(&p0["revisions"][0])?; 
+
+    write_code_onig::write_code(&lan, directory, &pd.title, &rd.content)?;
+    Ok(WrittenTask{pageid:pd.pageid, revid:rd.revid})
+}
+
 fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<WrittenTask> {
     // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
     tasks
@@ -236,7 +267,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if let Ok(tasks) = read_task_tally("tasks") {
 
 
-        let task_set : HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
+        let mut task_set : HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
 
         let revisions: Revisions = query(make_recentchanges_query_args())?;
         let mut rc = revisions.recentchanges;
@@ -245,7 +276,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             let current_task = WrittenTask {pageid:rev.pageid, revid:rev.revid};
             let old_task = WrittenTask {pageid:rev.pageid, revid:rev.old_revid};
             if task_set.contains(&old_task) && !task_set.contains(&current_task) {
-                println!("Found!");
+                if let Ok(written_task) = write_revision(&lan, "Task", rev) {
+                    println!("Updated {:?}", written_task);
+
+                    task_set.remove(&old_task);
+                    task_set.insert(written_task);
+                }
             } 
         }).collect::<Vec<_>>();
         

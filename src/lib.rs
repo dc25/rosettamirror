@@ -5,8 +5,10 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufWriter, Read, Write};
-// use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
+// use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 use crate::error::RosettaError;
 
@@ -33,6 +35,19 @@ impl ContinuedQuery for Tasks {
     fn concat(self: &mut Tasks, other: Tasks) {
         self.categorymembers.extend(other.categorymembers)
     }
+}
+
+#[derive(Deserialize, Debug)]
+struct PageDetail<'a> {
+    pageid: u64,
+    title: &'a str,
+}
+
+#[derive(Deserialize, Debug)]
+struct RevisionDetail<'a> {
+    content: &'a str,
+    revid: u64,
+    timestamp: &'a str,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -72,7 +87,7 @@ impl ContinuedQuery for Revisions {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize, Debug)]
 struct WrittenTask {
     pageid: u64,
     revid: u64,
@@ -126,7 +141,7 @@ fn make_task_query_args(task: &Task) -> Vec<(String, String)> {
         ("format", "json"),
         ("formatversion", "2"),
         ("prop", "revisions"),
-        ("rvprop", "content|ids"),
+        ("rvprop", "content|ids|timestamp"),
         ("pageids", &task.pageid.to_string()),
         ("continue", ""),
     ]
@@ -174,15 +189,13 @@ fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
 fn write_task(lan: &languages::Langs, directory: &str, task: &Task) -> Result<WrittenTask, Box<dyn Error>> {
     let response = &query_api(make_task_query_args(task))?;
     let v: &Value = &serde_json::from_str(response)?;
+    let p0 = &v["query"]["pages"][0]; 
 
-    let v2 = &v["query"]["pages"][0]["revisions"][0];
+    let pd = PageDetail::deserialize(p0)?; 
+    let rd = RevisionDetail::deserialize(&p0["revisions"][0])?; 
 
-    let content = v2["content"].as_str().ok_or(RosettaError::UnexpectedFormat)?;
-
-    let revid   = v2["revid"].as_u64().ok_or(RosettaError::UnexpectedFormat)?;
-
-    write_code_onig::write_code(&lan, directory, &task.title, content)?;
-    Ok(WrittenTask{pageid:task.pageid, revid:revid})
+    write_code_onig::write_code(&lan, directory, &pd.title, &rd.content)?;
+    Ok(WrittenTask{pageid:pd.pageid, revid:rd.revid})
 }
 
 fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<WrittenTask> {
@@ -190,12 +203,11 @@ fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<Wr
     tasks
         .categorymembers
         .iter()
-        .take(2)
         .flat_map(|task| write_task(lan, directory, task))
         .collect()
 }
 
-fn tally_tasks(written_tasks: Vec<WrittenTask>, tally_file_name: &str) -> Result<(), Box<dyn Error>> {
+fn write_task_tally(written_tasks: Vec<WrittenTask>, tally_file_name: &str) -> Result<(), Box<dyn Error>> {
     // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
     let f = File::create(tally_file_name)?;
     let mut b = BufWriter::new(f);
@@ -204,36 +216,46 @@ fn tally_tasks(written_tasks: Vec<WrittenTask>, tally_file_name: &str) -> Result
     Ok(())
 }
 
-pub fn run(_all: bool) -> Result<(), Box<dyn Error>> {
-    // let saved_tasks = read_tasks("tasks");
-    let _revisions: Revisions = query(make_recentchanges_query_args())?;
+fn read_task_tally(tally_file_name: &str) -> Result<Vec<WrittenTask>, Box<dyn Error>> {
+    // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
+    let f = File::open(tally_file_name)?;
+    let mut b = BufReader::new(f);
+    let mut s = String::new();
+    b.read_to_string(&mut s)?;
+    let v: Value = serde_json::from_str(&s)?;
+    let revi = <Vec<WrittenTask>>::deserialize(v)?;
 
+    Ok(revi)
+}
+
+pub fn run() -> Result<(), Box<dyn Error>> {
     let languages: Languages = query(make_category_query_args(
         "Programming_Languages",
     ))?;
     let lan = languages::Langs::new(&languages)?;
-
-    let tasks: Tasks = query(make_category_query_args(
-        "Programming_Tasks",
-    ))?;
-    let written_tasks = write_tasks(&tasks, &lan, "Task");
-    tally_tasks(written_tasks, "tasks")?;
-
-    let draft_tasks: Tasks = query(make_category_query_args(
-        "Draft_Programming_Tasks",
-    ))?;
-    let written_draft_tasks = write_tasks(&draft_tasks, &lan, "Task");
-    tally_tasks(written_draft_tasks, "tasks")?;
-
-    /*
-    let rfi = File::open("revisions")?;
-    let mut rbi = BufReader::new(rfi);
-    let mut rsi = String::new();
-    rbi.read_to_string(&mut rsi)?;
-    let v: Value = serde_json::from_str(&rsi)?;
-    let _revi = Revisions::deserialize(v)?;
-    */
+    if let Ok(tasks) = read_task_tally("tasks") {
 
 
+        let task_set : HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
+
+        let revisions: Revisions = query(make_recentchanges_query_args())?;
+        let mut rc = revisions.recentchanges;
+        rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        let _results = rc.iter().map(|rev| { 
+            let current_task = WrittenTask {pageid:rev.pageid, revid:rev.revid};
+            let old_task = WrittenTask {pageid:rev.pageid, revid:rev.old_revid};
+            if task_set.contains(&old_task) && !task_set.contains(&current_task) {
+                println!("Found!");
+            } 
+        }).collect::<Vec<_>>();
+        
+    } else {
+        let tasks: Tasks = query(make_category_query_args(
+            "Programming_Tasks",
+        ))?;
+        let written_tasks = write_tasks(&tasks, &lan, "Task");
+        write_task_tally(written_tasks, "tasks")?;
+    }
     Ok(())
 }
+

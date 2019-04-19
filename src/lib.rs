@@ -12,6 +12,8 @@ use std::iter::FromIterator;
 
 use crate::error::RosettaError;
 
+use std::process::Command;
+
 mod error;
 mod languages;
 mod write_code_onig;
@@ -287,40 +289,51 @@ fn initialize_tasks(lan: &languages::Langs, directory: &str) -> Result<Vec<Writt
 fn update_tasks(
     lan: &languages::Langs,
     directory: &str,
+    tally_file: &str,
     tasks: &[WrittenTask],
-) -> Result<Vec<WrittenTask>, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
     let mut task_set: HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
 
     let revisions: Revisions = query(make_recentchanges_query_args())?;
     let mut rc = revisions.recentchanges;
     rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-    let _unused = rc
+    let _u = rc
         .iter()
         .map(|rev| {
             let current_task = WrittenTask::new(rev.pageid, rev.revid);
             let old_task = WrittenTask::new(rev.pageid, rev.old_revid);
             if task_set.contains(&old_task) && !task_set.contains(&current_task) {
-                if let Ok((written_task, _timestamp, _user, _comment)) = write_revision(&lan, directory, rev) {
+                if let Ok((written_task, timestamp, user, comment)) = write_revision(&lan, directory, rev) {
                     task_set.remove(&old_task);
                     task_set.insert(written_task);
+                    let task_vec:Vec<_> = task_set.clone().into_iter().collect();
+                    let _unused = write_task_tally(task_vec, tally_file);
+                    let _output = Command::new("/home/dave/savetogit")
+                         .arg(user)
+                         .arg(comment)
+                         .arg(timestamp)
+                         .output();
                 }
             }
         })
         .collect::<Vec<_>>();
-    Ok(task_set.into_iter().collect::<Vec<WrittenTask>>())
+    Ok(())
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {
     let directory = "Task";
-    let tally_file = "tasks";
+    let tally_file = &"tasks";
     let category_name = "Programming_Languages";
     let languages: Languages = query(make_category_query_args(category_name))?;
-    let lan = languages::Langs::new(&languages)?;
-    let written_tasks = if let Ok(tasks) = read_task_tally(&tally_file) {
-        update_tasks(&lan, directory, &tasks)?
-    } else {
-        initialize_tasks(&lan, directory)?
-    };
-    write_task_tally(written_tasks, &tally_file)?;
+    let lan = &languages::Langs::new(&languages)?;
+    match read_task_tally(tally_file) {
+        Ok(tasks) => {
+            update_tasks(lan, directory, tally_file, &tasks)?;
+        }
+        Err(_) =>  {
+            let written_tasks = initialize_tasks(lan, directory)?;
+            write_task_tally(written_tasks, tally_file)?;
+        }
+    }
     Ok(())
 }

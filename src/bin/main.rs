@@ -1,6 +1,6 @@
 use rosettamirror;
-use std::error::Error;
 use std::env;
+use std::error::Error;
 use std::fs;
 use structopt::StructOpt;
 
@@ -18,7 +18,9 @@ struct Opt {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
-    fs::DirBuilder::new().recursive(true).create(&opt.directory)?;
-	env::set_current_dir(&opt.directory)?;
+    fs::DirBuilder::new()
+        .recursive(true)
+        .create(&opt.directory)?;
+    env::set_current_dir(&opt.directory)?;
     rosettamirror::run()
 }

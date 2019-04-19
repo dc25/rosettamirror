@@ -215,25 +215,22 @@ fn write_task_response(
     lan: &languages::Langs,
     directory: &str,
     response: &str,
-) -> Result<WrittenTask, Box<dyn Error>> {
+) -> Result<(WrittenTask,String, String, String), Box<dyn Error>> {
     let v: &Value = &serde_json::from_str(response)?;
     let p0 = &v["query"]["pages"][0];
 
     let pd = PageDetail::deserialize(p0)?;
     let rd = RevisionDetail::deserialize(&p0["revisions"][0])?;
 
-    write_code_onig::write_code(&lan, directory, &pd.title, &rd.content)?;
-    Ok(WrittenTask {
-        pageid: pd.pageid,
-        revid: rd.revid,
-    })
+    write_code_onig::write_code(lan, directory, pd.title, rd.content)?;
+    Ok((WrittenTask::new (pd.pageid, rd.revid), rd.timestamp.to_string(), rd.user.to_string(), rd.comment.to_string()))
 }
 
 fn write_revision(
     lan: &languages::Langs,
     directory: &str,
     revision: &Revision,
-) -> Result<WrittenTask, Box<dyn Error>> {
+) -> Result<(WrittenTask, String, String, String), Box<dyn Error>> {
     let response = &query_api(make_revision_query_args(revision))?;
     write_task_response(lan, directory, response)
 }
@@ -244,7 +241,8 @@ fn write_task(
     task: &Task,
 ) -> Result<WrittenTask, Box<dyn Error>> {
     let response = &query_api(make_task_query_args(task))?;
-    write_task_response(lan, directory, response)
+    let (wt, _, _, _) = write_task_response(lan, directory, response)?;
+    Ok(wt)
 }
 
 fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<WrittenTask> {
@@ -280,13 +278,15 @@ fn read_task_tally(tally_file_name: &str) -> Result<Vec<WrittenTask>, Box<dyn Er
     Ok(revi)
 }
 
-fn initialize_tasks(lan: &languages::Langs) -> Result<Vec<WrittenTask>, Box<dyn Error>> {
+fn initialize_tasks(lan: &languages::Langs, directory: &str) -> Result<Vec<WrittenTask>, Box<dyn Error>> {
     let tasks: Tasks = query(make_category_query_args("Programming_Tasks"))?;
-    Ok(write_tasks(&tasks, &lan, "Task"))
+    let written_tasks = write_tasks(&tasks, &lan, directory);
+    Ok(written_tasks)
 }
 
 fn update_tasks(
     lan: &languages::Langs,
+    directory: &str,
     tasks: &[WrittenTask],
 ) -> Result<Vec<WrittenTask>, Box<dyn Error>> {
     let mut task_set: HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
@@ -300,7 +300,7 @@ fn update_tasks(
             let current_task = WrittenTask::new(rev.pageid, rev.revid);
             let old_task = WrittenTask::new(rev.pageid, rev.old_revid);
             if task_set.contains(&old_task) && !task_set.contains(&current_task) {
-                if let Ok(written_task) = write_revision(&lan, "Task", rev) {
+                if let Ok((written_task, _timestamp, _user, _comment)) = write_revision(&lan, directory, rev) {
                     task_set.remove(&old_task);
                     task_set.insert(written_task);
                 }
@@ -311,13 +311,16 @@ fn update_tasks(
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {
-    let languages: Languages = query(make_category_query_args("Programming_Languages"))?;
+    let directory = "Task";
+    let tally_file = "tasks";
+    let category_name = "Programming_Languages";
+    let languages: Languages = query(make_category_query_args(category_name))?;
     let lan = languages::Langs::new(&languages)?;
-    let written_tasks = if let Ok(tasks) = read_task_tally("tasks") {
-        update_tasks(&lan, &tasks)?
+    let written_tasks = if let Ok(tasks) = read_task_tally(&tally_file) {
+        update_tasks(&lan, directory, &tasks)?
     } else {
-        initialize_tasks(&lan)?
+        initialize_tasks(&lan, directory)?
     };
-    write_task_tally(written_tasks, "tasks")?;
+    write_task_tally(written_tasks, &tally_file)?;
     Ok(())
 }

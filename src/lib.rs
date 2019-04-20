@@ -7,7 +7,6 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::collections::HashSet;
-use std::iter::FromIterator;
 use std::process::Command;
 use crate::error::RosettaError;
 
@@ -38,18 +37,18 @@ impl ContinuedQuery for Tasks {
 }
 
 #[derive(Deserialize, Debug)]
-struct PageDetail<'a> {
+struct PageDetail {
     pageid: u64,
-    title: &'a str,
+    title: String,
 }
 
 #[derive(Deserialize, Debug)]
 struct RevisionDetail<'a> {
     content: &'a str,
     revid: u64,
-    timestamp: &'a str,
-    user: &'a str,
-    comment: &'a str,
+    timestamp: String,
+    user: String,
+    comment: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -215,22 +214,22 @@ fn write_task_response(
     lan: &languages::Langs,
     directory: &str,
     response: &str,
-) -> Result<(WrittenTask,String, String, String), Box<dyn Error>> {
+) -> Result<(WrittenTask,String, String, String, String), Box<dyn Error>> {
     let v: &Value = &serde_json::from_str(response)?;
     let p0 = &v["query"]["pages"][0];
 
     let pd = PageDetail::deserialize(p0)?;
     let rd = RevisionDetail::deserialize(&p0["revisions"][0])?;
 
-    write_code_onig::write_code(lan, directory, pd.title, rd.content)?;
-    Ok((WrittenTask::new (pd.pageid, rd.revid), rd.timestamp.to_string(), rd.user.to_string(), rd.comment.to_string()))
+    write_code_onig::write_code(lan, directory, &pd.title, rd.content)?;
+    Ok((WrittenTask::new (pd.pageid, rd.revid), rd.timestamp, rd.user, rd.comment, pd.title))
 }
 
 fn write_revision(
     lan: &languages::Langs,
     directory: &str,
     revision: &Revision,
-) -> Result<(WrittenTask, String, String, String), Box<dyn Error>> {
+) -> Result<(WrittenTask, String, String, String, String), Box<dyn Error>> {
     let response = &query_api(make_revision_query_args(revision))?;
     write_task_response(lan, directory, response)
 }
@@ -241,11 +240,11 @@ fn write_task(
     task: &Task,
 ) -> Result<WrittenTask, Box<dyn Error>> {
     let response = &query_api(make_task_query_args(task))?;
-    let (wt, _, _, _) = write_task_response(lan, directory, response)?;
+    let (wt, _, _, _, _) = write_task_response(lan, directory, response)?;
     Ok(wt)
 }
 
-fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<WrittenTask> {
+fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> HashSet<WrittenTask> {
     // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
     tasks
         .categorymembers
@@ -255,7 +254,7 @@ fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> Vec<Wr
 }
 
 fn write_task_tally(
-    written_tasks: Vec<WrittenTask>,
+    written_tasks: &HashSet<WrittenTask>,
     tally_file_name: &str,
 ) -> Result<(), Box<dyn Error>> {
     // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
@@ -266,19 +265,19 @@ fn write_task_tally(
     Ok(())
 }
 
-fn read_task_tally(tally_file_name: &str) -> Result<Vec<WrittenTask>, Box<dyn Error>> {
+fn read_task_tally(tally_file_name: &str) -> Result<HashSet<WrittenTask>, Box<dyn Error>> {
     // flat_map trick ref : https://stackoverflow.com/a/28572170/509928
     let f = File::open(tally_file_name)?;
     let mut b = BufReader::new(f);
     let mut s = String::new();
     b.read_to_string(&mut s)?;
     let v: Value = serde_json::from_str(&s)?;
-    let revi = <Vec<WrittenTask>>::deserialize(v)?;
+    let revi = <HashSet<WrittenTask>>::deserialize(v)?;
 
     Ok(revi)
 }
 
-fn initialize_tasks(lan: &languages::Langs, directory: &str) -> Result<Vec<WrittenTask>, Box<dyn Error>> {
+fn initialize_tasks(lan: &languages::Langs, directory: &str) -> Result<HashSet<WrittenTask>, Box<dyn Error>> {
     let tasks: Tasks = query(make_category_query_args("Programming_Tasks"))?;
     let written_tasks = write_tasks(&tasks, &lan, directory);
     Ok(written_tasks)
@@ -288,9 +287,9 @@ fn update_tasks(
     lan: &languages::Langs,
     directory: &str,
     tally_file: &str,
-    tasks: &[WrittenTask],
+    tasks: &HashSet<WrittenTask>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut task_set: HashSet<WrittenTask> = HashSet::from_iter(tasks.iter().cloned());
+    let mut task_set: HashSet<WrittenTask> = tasks.clone();
 
     let revisions: Revisions = query(make_recentchanges_query_args())?;
     let mut rc = revisions.recentchanges;
@@ -301,15 +300,15 @@ fn update_tasks(
             let current_task = WrittenTask::new(rev.pageid, rev.revid);
             let old_task = WrittenTask::new(rev.pageid, rev.old_revid);
             if task_set.contains(&old_task) && !task_set.contains(&current_task) {
-                if let Ok((written_task, timestamp, user, comment)) = write_revision(&lan, directory, rev) {
+                if let Ok((written_task, timestamp, user, comment, title)) = write_revision(&lan, directory, rev) {
                     task_set.remove(&old_task);
                     task_set.insert(written_task);
-                    let task_vec:Vec<_> = task_set.clone().into_iter().collect();
-                    let _unused = write_task_tally(task_vec, tally_file);
+                    let _unused = write_task_tally(&task_set, tally_file);
                     let _output = Command::new("/home/dave/savetogit")
                          .arg(user)
                          .arg(comment)
                          .arg(timestamp)
+                         .arg(title)
                          .output();
                 }
             }
@@ -330,7 +329,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
         Err(_) =>  {
             let written_tasks = initialize_tasks(lan, directory)?;
-            write_task_tally(written_tasks, tally_file)?;
+            write_task_tally(&written_tasks, tally_file)?;
         }
     }
     Ok(())

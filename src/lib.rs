@@ -283,6 +283,24 @@ fn initialize_tasks(lan: &languages::Langs, directory: &str) -> Result<HashSet<W
     Ok(written_tasks)
 }
 
+fn process_revision (lan: &languages::Langs, directory: &str, revision: &Revision, tally_file: &str, task_set: &mut HashSet<WrittenTask>) -> () {
+    let current_task = WrittenTask::new(revision.pageid, revision.revid);
+    let old_task = WrittenTask::new(revision.pageid, revision.old_revid);
+    if task_set.contains(&old_task) && !task_set.contains(&current_task) {
+        if let Ok((written_task, timestamp, user, comment, title)) = write_revision(&lan, directory, revision) {
+            task_set.remove(&old_task);
+            task_set.insert(written_task);
+            let _unused = write_task_tally(&task_set, tally_file);
+            let _output = Command::new("/home/dave/savetogit")
+                 .arg(user)
+                 .arg(comment)
+                 .arg(timestamp)
+                 .arg(title)
+                 .output();
+        }
+    }
+}
+
 fn update_tasks(
     lan: &languages::Langs,
     directory: &str,
@@ -296,23 +314,7 @@ fn update_tasks(
     rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
     let _u = rc
         .iter()
-        .map(|rev| {
-            let current_task = WrittenTask::new(rev.pageid, rev.revid);
-            let old_task = WrittenTask::new(rev.pageid, rev.old_revid);
-            if task_set.contains(&old_task) && !task_set.contains(&current_task) {
-                if let Ok((written_task, timestamp, user, comment, title)) = write_revision(&lan, directory, rev) {
-                    task_set.remove(&old_task);
-                    task_set.insert(written_task);
-                    let _unused = write_task_tally(&task_set, tally_file);
-                    let _output = Command::new("/home/dave/savetogit")
-                         .arg(user)
-                         .arg(comment)
-                         .arg(timestamp)
-                         .arg(title)
-                         .output();
-                }
-            }
-        })
+        .map(|revision| process_revision (lan, directory, revision, tally_file, &mut task_set) )
         .collect::<Vec<_>>();
     Ok(())
 }

@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::collections::HashSet;
 use std::process::Command;
+use std::str;
 use crate::error::RosettaError;
 
 
@@ -283,22 +284,52 @@ fn initialize_tasks(lan: &languages::Langs, directory: &str) -> Result<HashSet<W
     Ok(written_tasks)
 }
 
-fn process_revision (lan: &languages::Langs, directory: &str, revision: &Revision, tally_file: &str, task_set: &mut HashSet<WrittenTask>) -> () {
+fn diff_names(directory: &str) -> Result<String, Box<dyn Error>> {
+    Command::new("git") 
+         .arg("add")
+         .arg(directory)
+         .output()?;
+
+    let output = Command::new("git") 
+         .arg("diff")
+         .arg("--name-only")
+         .arg("--cached")
+         .arg(directory)
+         .output()?;
+
+    let ostr = str::from_utf8(&output.stdout)?;
+    Ok(ostr.to_string())
+}
+
+fn commit_changes(comment: &str) -> Result<(), Box<dyn Error>> {
+    Command::new("git") 
+         .arg("add")
+         .arg(".")
+         .output()?;
+
+    Command::new("git") 
+         .arg("commit")
+         .arg("-m")
+         .arg(comment)
+         .output()?;
+    Ok(())
+}
+
+fn process_revision (lan: &languages::Langs, directory: &str, revision: &Revision, tally_file: &str, task_set: &mut HashSet<WrittenTask>) -> Result<(), Box<dyn Error>> {
     let current_task = WrittenTask::new(revision.pageid, revision.revid);
     let old_task = WrittenTask::new(revision.pageid, revision.old_revid);
     if task_set.contains(&old_task) && !task_set.contains(&current_task) {
-        if let Ok((written_task, timestamp, user, comment, title)) = write_revision(&lan, directory, revision) {
-            task_set.remove(&old_task);
-            task_set.insert(written_task);
-            let _unused = write_task_tally(&task_set, tally_file);
-            let _output = Command::new("/home/dave/savetogit")
-                 .arg(user)
-                 .arg(comment)
-                 .arg(timestamp)
-                 .arg(title)
-                 .output();
+        let (written_task, timestamp, user, comment, title) = write_revision(&lan, directory, revision)?;
+        task_set.remove(&old_task);
+        task_set.insert(written_task);
+        let modified = diff_names(directory)?;
+        if modified != "" {
+            write_task_tally(&task_set, tally_file)?;
+            let comment_arg = format!("task: {}\nuser: {}\ncomment: {}\ntimestamp: {}\nmodified: {}\n", title, user, comment, timestamp, modified);
+            commit_changes(&comment_arg)?;
         }
     }
+    Ok(())
 }
 
 fn update_tasks(
@@ -314,7 +345,7 @@ fn update_tasks(
     rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
     let _u = rc
         .iter()
-        .map(|revision| process_revision (lan, directory, revision, tally_file, &mut task_set) )
+        .flat_map(|revision| process_revision (lan, directory, revision, tally_file, &mut task_set) )
         .collect::<Vec<_>>();
     Ok(())
 }

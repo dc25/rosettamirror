@@ -300,7 +300,7 @@ fn initialize_tasks(
     let tasks: Tasks = query(make_category_query_args(category_name))?;
     let written_tasks = write_tasks(&tasks, &lan, directory);
     write_task_tally(&written_tasks, tally_file)?;
-    init_repo()?;
+    init_repo(directory)?;
     Ok(())
 }
 
@@ -328,9 +328,9 @@ fn commit_changes(comment: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn init_repo() -> Result<(), Box<dyn Error>> {
+fn init_repo(directory: &str) -> Result<(), Box<dyn Error>> {
     Command::new("git").arg("init").output()?;
-    commit_changes("initial commit")
+    commit_changes(&(directory.to_string() + ": initial commit"))
 }
 
 fn read_revision_timestamp() -> Result<String, Box<dyn Error>> {
@@ -420,6 +420,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     update_tasks(lan, &"Task", &"tasks", &"Programming_Tasks", &rc)?;
+    update_tasks(lan, &"Draft_Task", &"draft_tasks", &"Draft_Programming_Tasks", &rc)?;
+    update_tasks(lan, &"Simple_Task", &"simple_tasks", &"Simple", &rc)?;
 
     Ok(())
 }

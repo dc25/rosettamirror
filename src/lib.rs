@@ -271,17 +271,17 @@ fn write_tasks(tasks: &Tasks, lan: &languages::Langs, directory: &str) -> HashSe
 
 fn write_task_tally(
     written_tasks: &HashSet<WrittenTask>,
-    tally_file_name: &str,
+    directory: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let f = File::create(tally_file_name)?;
+    let f = File::create(directory.to_string() + "/tasks")?;
     let mut b = BufWriter::new(f);
     let s = serde_json::to_string(&written_tasks)?;
     b.write_all(s.as_bytes())?;
     Ok(())
 }
 
-fn read_task_tally(tally_file_name: &str) -> Result<HashSet<WrittenTask>, Box<dyn Error>> {
-    let f = File::open(tally_file_name)?;
+fn read_task_tally(directory: &str) -> Result<HashSet<WrittenTask>, Box<dyn Error>> {
+    let f = File::open(directory.to_string() + "/tasks")?;
     let mut b = BufReader::new(f);
     let mut s = String::new();
     b.read_to_string(&mut s)?;
@@ -293,14 +293,12 @@ fn read_task_tally(tally_file_name: &str) -> Result<HashSet<WrittenTask>, Box<dy
 
 fn initialize_tasks(
     lan: &languages::Langs,
-    directory: &str,
-    tally_file: &str,
     category_name: &str,
 ) -> Result<(), Box<dyn Error>> {
     let tasks: Tasks = query(make_category_query_args(category_name))?;
-    let written_tasks = write_tasks(&tasks, &lan, directory);
-    write_task_tally(&written_tasks, tally_file)?;
-    init_repo(directory)?;
+    let written_tasks = write_tasks(&tasks, &lan, category_name);
+    write_task_tally(&written_tasks, category_name)?;
+    init_repo(category_name)?;
     Ok(())
 }
 
@@ -355,7 +353,6 @@ fn save_revision_timestamp(ts: &str) -> Result<(), Box<dyn Error>> {
 fn process_revision(
     lan: &languages::Langs,
     directory: &str,
-    tally_file: &str,
     revision: &Revision,
     task_set: &mut HashSet<WrittenTask>,
 ) -> Result<(), Box<dyn Error>> {
@@ -372,7 +369,7 @@ fn process_revision(
                 "task: {}\nuser: {}\ncomment: {}\ntimestamp: {}\nmodified: {}\n",
                 title, user, comment, timestamp, modified
             );
-            write_task_tally(task_set, tally_file)?;
+            write_task_tally(task_set, directory)?;
             save_revision_timestamp(&revision.timestamp)?;
             commit_changes(&comment_arg)?;
         }
@@ -383,7 +380,6 @@ fn process_revision(
 fn update_new_tasks(
     lan: &languages::Langs,
     directory: &str,
-    tally_file: &str,
     tasks: &HashSet<WrittenTask>,
     rc: &[Revision],
 ) -> Result<(), Box<dyn Error>> {
@@ -391,21 +387,19 @@ fn update_new_tasks(
 
     let _u = rc
         .iter()
-        .flat_map(|revision| process_revision(lan, directory, tally_file, revision, &mut task_set))
+        .flat_map(|revision| process_revision(lan, directory, revision, &mut task_set))
         .collect::<Vec<_>>();
     Ok(())
 }
 
 fn update_tasks(
     lan: &languages::Langs,
-    directory: &str,
-    tally_file: &str,
     category_name: &str,
     rc: &[Revision],
 ) -> Result<(), Box<dyn Error>> {
-    match read_task_tally(tally_file) {
-        Ok(tasks) => update_new_tasks(lan, directory, tally_file, &tasks, &rc),
-        Err(_) => initialize_tasks(lan, directory, tally_file, category_name),
+    match read_task_tally(category_name) {
+        Ok(tasks) => update_new_tasks(lan, category_name, &tasks, &rc),
+        Err(_) => initialize_tasks(lan, category_name),
     }
 }
 
@@ -419,9 +413,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let mut rc = revisions.recentchanges;
     rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
-    update_tasks(lan, &"Task", &"tasks", &"Programming_Tasks", &rc)?;
-    update_tasks(lan, &"Draft_Task", &"draft_tasks", &"Draft_Programming_Tasks", &rc)?;
-    update_tasks(lan, &"Simple_Task", &"simple_tasks", &"Simple", &rc)?;
+    update_tasks(lan, &"Programming_Tasks", &rc)?;
+    update_tasks(lan, &"Draft_Programming_Tasks", &rc)?;
+    update_tasks(lan, &"Simple", &rc)?;
 
     Ok(())
 }

@@ -392,14 +392,17 @@ fn update_new_tasks(
     Ok(())
 }
 
-fn update_tasks(
+fn update_tasks<'a>(
     lan: &languages::Langs,
-    category_name: &str,
+    category_name: &'a str,
     rc: &[Revision],
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Option<&'a str>, Box<dyn Error>> {
     match read_task_tally(category_name) {
-        Ok(tasks) => update_new_tasks(lan, category_name, &tasks, &rc),
-        Err(_) => initialize_tasks(lan, category_name),
+        Ok(tasks) => { 
+            update_new_tasks(lan, category_name, &tasks, &rc)?; 
+            Ok(None)
+        },
+        _ => Ok(Some(category_name))
     }
 }
 
@@ -413,9 +416,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let mut rc = revisions.recentchanges;
     rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
-    update_tasks(lan, &"Programming_Tasks", &rc)?;
-    update_tasks(lan, &"Draft_Programming_Tasks", &rc)?;
-    update_tasks(lan, &"Simple", &rc)?;
+    let categories = [
+        "Programming_Tasks",
+        "Draft_Programming_Tasks",
+        "Simple",
+    ];
+
+    // do updates first so that timestamp gets set before reading tasks for new category.
+    
+    let new_categories = categories
+                             .iter()
+                             .map(|category|
+                                  update_tasks(lan, category, &rc))
+                             .collect::<Result<Vec<_>,_>>()?;
+
+    let _unused = new_categories
+                             .iter()
+                             .map(|category| {
+                                  match category {
+                                      Some(cat) => initialize_tasks(lan, cat),
+                                      _ => Ok(()),
+                                  }
+                             })
+                             .collect::<Result<Vec<_>,_>>()?;
 
     Ok(())
 }

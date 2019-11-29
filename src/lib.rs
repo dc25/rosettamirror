@@ -407,10 +407,12 @@ fn update_tasks<'a>(
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {
+    // first gather up all languages by name
     let category_name = "Programming_Languages";
     let languages: Languages = query(make_category_query_args(category_name))?;
     let lan = &languages::Langs::new(&languages)?;
 
+    // get previous timestamp (if it exists).
     let timestamp = read_revision_timestamp().ok();
     let revisions: Revisions = query(make_recentchanges_query_args(timestamp))?;
     let mut rc = revisions.recentchanges;

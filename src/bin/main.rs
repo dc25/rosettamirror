@@ -24,3 +24,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     env::set_current_dir(&opt.directory)?;
     rosettamirror::run()
 }
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn sample_test() {
+		rosettamirror::run().unwrap();
+    }
+
+}

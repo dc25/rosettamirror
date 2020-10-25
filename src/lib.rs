@@ -192,32 +192,22 @@ fn to_continue_pair(ca: (&String, &Value)) -> Result<(String, String), Box<dyn E
 fn query<'a, T: Deserialize<'a> + Default + ContinuedQuery>(
     query_args: Vec<(String, String)>,
 ) -> Result<T, Box<dyn Error>> {
-    let mut complete: T = Default::default();
 
-    let mut cont_args = vec![("continue".to_owned(), "".to_owned())];
+        let v: Value = serde_json::from_str(&"xxx")?;
+        let query_value: &Value = &v["query"];    
+        let partial: T = T::deserialize(query_value.clone())?; // why the clone? // Answer(?):  because deserialize takes ownership of its argument.
+        return Ok(partial);
 
-    loop {
-        let mut ac = query_args.clone();
-        ac.extend(cont_args);
-        let s = query_api(ac)?;
-        let v: Value = serde_json::from_str(&s)?;
-        let qv = &v["query"];
-        let partial = T::deserialize(qv.clone())?; // why the clone?
-        complete.concat(partial);
+}
 
-        let cv = &v["continue"];
+fn tq<'a, T: Deserialize<'a> >() -> () {
 
-        if !cv.is_object() {
-            return Ok(complete);
-        }
+        let v: Value = serde_json::from_str("xxx").unwrap();
+        let query_value: &Value = &v["query"];   
+        println!("{}", query_value); 
+        // ()
+        // T::deserialize(query_value).unwrap()
 
-        cont_args = cv
-            .as_object()
-            .ok_or(RosettaError::UnexpectedFormat)?
-            .iter()
-            .map(to_continue_pair)
-            .collect::<Result<_, _>>()?;
-    }
 }
 
 fn write_task_response(
@@ -408,8 +398,9 @@ fn update_tasks<'a>(
 
 pub fn run() -> Result<(), Box<dyn Error>> {
     // first gather up all languages by name
-    let category_name = "Programming_Languages";
-    let languages: Languages = query(make_category_query_args(category_name))?;
+    //let category_name = "Programming_Languages";
+    let languages_query_args = make_category_query_args("Programming_Languages");
+    let languages = query(languages_query_args)?;
     let lan = &languages::Langs::new(&languages)?;
 
     // get previous timestamp (if it exists).
@@ -419,7 +410,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     rc.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     let categories = [
-        "Programming_Tasks",
+        //"Programming_Tasks",
         "Draft_Programming_Tasks",
         "Simple",
     ];

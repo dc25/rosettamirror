@@ -104,7 +104,7 @@ fn query_api(args: Vec<(String, String)>) -> Result<String, Box<dyn Error>> {
     let mut query = url::Url::parse("http://rosettacode.org/mw/api.php")?;
 
     query.query_pairs_mut().extend_pairs(args.into_iter());
-    let mut response = (reqwest::get(query.as_str()))?;
+    let mut response = (reqwest::blocking::get(query.as_str()))?;
     let mut body = String::new();
     response.read_to_string(&mut body)?;
     Ok(body)
